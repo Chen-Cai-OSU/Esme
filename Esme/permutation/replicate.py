@@ -7,7 +7,7 @@ from Esme.dgms.fil import gs2dgms
 from Esme.dgms.stats import dgms_summary
 from Esme.dgms.arithmetic import add_dgms
 from Esme.dgms.vector import dgms2feature, merge_dgms
-from Esme.helper.load_graph import load_graphs
+from Esme.helper.load_graph import load_graphs, load_graphs_from_torch
 from Esme.ml.svm import classifier
 from Esme.dgms.fake import permute_dgms
 from Esme.dgms.kernel import sw, sw_parallel
@@ -17,8 +17,8 @@ from Esme.helper.debug import debug
 from joblib import Parallel, delayed
 from Esme.dgms.fil import g2dgm
 from Esme.dgms.ioio import dgms_dir_test, load_dgms, save_dgms
-from Esme.graph.dataset.tu_dataset import load_tugraphs
-from Esme.graph.dataset.tu_dataset import graphs_stat
+# from Esme.graph.dataset.tu_dataset import load_tugraphs
+# from Esme.graph.dataset.tu_dataset import graphs_stat
 
 from sacred import Experiment
 from sacred.observers import MongoObserver
@@ -88,7 +88,9 @@ def main(graph, fil, norm, permute, ss, epd, n_cv, flip, feat, feat_kwargs):
     print('kwargs', feat_kwargs)
     label_flag =  dgms_dir_test(fil=fil, fil_d='sub', norm=norm, graph = graph)[1]
     print('Loading graphs...')
-    gs, labels = load_graphs(dataset=graph, labels_only=label_flag)  # step 1
+    # gs, labels = load_graphs(dataset=graph, labels_only=label_flag)  # step 1
+    gs, labels = load_graphs_from_torch(graph)
+
         # print(labels)
         # graphs_stat(gs)
         # gs, labels = load_tugraphs(graph, labels_only=True)

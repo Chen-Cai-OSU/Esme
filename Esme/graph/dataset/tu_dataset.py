@@ -194,8 +194,6 @@ if __name__ == '__main__':
             return data.num_nodes <= max_nodes
 
     path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', args.graph)
-    # path = '/home/cai.507/Documents/DeepLearning/Esmé/Esme/graph/dataset/../data/MUTAG'
-    # dataset = TUDataset(path, name=args.graph, transform=T.ToDense(max_nodes))
     dataset = TUDataset(path, name=args.graph)
 
     print(int(dataset[1].y[0]))

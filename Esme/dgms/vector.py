@@ -6,8 +6,8 @@ import time
 import sys
 from sklearn.preprocessing import normalize
 from joblib import Parallel, delayed
-import sklearn_tda as tda
 import time
+import sklearn_tda as tda
 
 from Esme.helper.stat import statfeat
 from Esme.dgms.format import dgms2diags, dgm2diag
@@ -253,7 +253,6 @@ def dgm_statfeat(dgm):
     lifetime = [abs(p[1] - p[0]) for p in diag]
     feat = np.concatenate((statfeat(birthtime), statfeat(deathtime), statfeat(lifetime)))
     return feat
-
 
 
 if __name__ == '__main__':

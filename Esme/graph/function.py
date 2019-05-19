@@ -142,7 +142,8 @@ def fil_strategy(g, nodefeat, method='node', viz_flag = False, **kwargs):
     elif method == 'combined':
         # need to turn on zigzag flag
         try:
-            p_zhang = graphonlib.smoothing.zhang.smoother(a, h=kwargs['h'])  # h : neighborhood size parameter. Example: 0.3 means to include
+            h = 0.3 if 'h' not in kwargs.keys() else kwargs['h']
+            p_zhang = graphonlib.smoothing.zhang.smoother(a, h=h)  # h : neighborhood size parameter. Example: 0.3 means to include
         except ValueError:  # for nci1, some adj matrix is rather small
             print('Exception: set p_zhang as 0')
             p_zhang = np.zeros((len(g), len(g)))

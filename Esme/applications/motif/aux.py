@@ -3,7 +3,7 @@ import time
 import networkx as nx
 import os
 
-from Esme.dgms.vector import persistence_vectors
+from Esme.dgms.vector import pdvector
 from Esme.graph.function import function_basis
 from Esme.helper.format import precision_format
 from Esme.helper.io import io, make_dir
@@ -34,7 +34,8 @@ def pdemb(dgms, dataset='wikipedia', recompute_flag=True, norm=True):
         pdvectors = np.load(file_)
         print('Loading existing persistence embedding from %s'%file_)
     except IOError:
-        pdvectors = persistence_vectors(dgms)
+        pdv = pdvector()
+        pdvectors = pdv.persistence_vectors(dgms)
         np.save(file, pdvectors)
         print('Finish saving %s pdvectors at %s'%(n, file))
     return pdvectors
