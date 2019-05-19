@@ -1,0 +1,1 @@
+* Dependicies: networkx, sklearn, dionysus, and sklearn_tda[https://github.com/MathieuCarriere/sklearn_tda]
