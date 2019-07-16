@@ -8,8 +8,9 @@ from joblib import Parallel, delayed
 from Esme.dgms.test import generate_swdgm
 from Esme.helper.format import precision_format
 from Esme.helper.time import timefunction
+from Esme.helper.others import assert_names
 
-def sw(dgms1, dgms2, parallel_flag=False, kernel_type='sw', **kwargs):
+def sw(dgms1, dgms2, kernel_type='sw', parallel_flag=False, **kwargs):
     # dgms1, dgms2 here are numpy array
     """
     :param dgms1:
@@ -26,13 +27,16 @@ def sw(dgms1, dgms2, parallel_flag=False, kernel_type='sw', **kwargs):
 
     if parallel_flag==False:
         if kernel_type=='sw':
-            tda_kernel = tda.SlicedWassersteinKernel(num_directions=kwargs['n_d'], bandwidth=kwargs['bw'])
+            assert_names(['n_directions', 'bw'], kwargs)
+            tda_kernel = tda.SlicedWassersteinKernel(num_directions=kwargs['n_directions'], bandwidth=kwargs['bw'])
         elif kernel_type=='pss':
+            assert_names(['bw'], kwargs)
             tda_kernel = tda.PersistenceScaleSpaceKernel(bandwidth=kwargs['bw'])
         elif kernel_type == 'wg':
+            assert_names(['bw', 'K', 'p'], kwargs)
             tda_kernel = tda.PersistenceWeightedGaussianKernel(bandwidth=kwargs['bw'], weight=arctan(kwargs['K'], kwargs['p']))
         else:
-            print ('Unknown kernel')
+            print ('Unknown kernel for function sw')
 
         diags1 = dgms1; diags2 = dgms2
         X = tda_kernel.fit(diags1)
@@ -40,13 +44,12 @@ def sw(dgms1, dgms2, parallel_flag=False, kernel_type='sw', **kwargs):
         return Y
 
 @timefunction
-def sw_parallel(dgms1, dgms2,  kernel_type='sw', parallel_flag=True, n_directions=10, granularity=25, **kwargs):
+def sw_parallel(dgms1, dgms2,  kernel_type='sw', parallel_flag=True, granularity=25, **kwargs):
     """
     :param dgms1: a list of array. kwargs: contain bw;
     :param dgms2:
     :param kernel_type: sw, pss, wg
     :param parallel_flag: Ture if want to compute in parallel
-    :param n_directions: n_dictions to approximate sw kernel
     :param granularity: import for parallel computing.
     :param kwargs: kwargs for sw/pss/wg
     :return:
@@ -65,7 +68,7 @@ def sw_parallel(dgms1, dgms2,  kernel_type='sw', parallel_flag=True, n_direction
         kernel = (np.vstack(kernel))
     else: # used as verification
         for i in range(n2):
-            kernel[i] = sw(dgms1, [dgms2[i]], kernel_type=kernel_type, n_directions=n_directions, bandwidth=kwargs['bw'])
+            kernel[i] = sw(dgms1, [dgms2[i]], kernel_type=kernel_type, **kwargs)
 
     t = precision_format(time.time()-t1, 1)
     print('Finish computing %s kernel of shape %s. Takes %s'%(kernel_type, kernel.shape, t))
@@ -105,9 +108,11 @@ if __name__ == '__main__':
     dummy_kwargs = {'K': 1, 'p': 1}
     serial_kernel = sw_parallel(dgms1, dgms1, bw=1, parallel_flag=False, **dummy_kwargs)[0]
     parallel_kernel = sw_parallel(dgms1, dgms1, bw=1, parallel_flag=True, **dummy_kwargs)[0]
+
     diff = serial_kernel - parallel_kernel
     assert np.max(diff) < 1e-5
     sys.exit()
+
     dgms1 = random_dgms(300)
-    # dgms2 = random_dgms(3)
-    print(sw_parallel(dgms1, dgms1, parallel_flag=False, kernel_type='sw', n_directions=10, bandwidth=1.0, K=1, p=1))
+    kwargs = {'n_directions':10, 'bandwidth':1.0, 'K':1, 'p':1}
+    print(sw_parallel(dgms1, dgms1, parallel_flag=False, kernel_type='sw', **kwargs))

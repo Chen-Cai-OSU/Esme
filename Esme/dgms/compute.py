@@ -329,6 +329,5 @@ if __name__=='__main__':
         gs.append(g)
 
     # res = Parallel(n_jobs=-1)(delayed(wrapper_getdiagram)(g) for g in gs) # the cpu usage is only 250%. TODO: optimize
-    # dgms = res2dgms(res)
     alldgms(gs, radius=1, n=100, dataset='blogcatalog', recompute_flag=True, method='serial')
 

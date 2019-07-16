@@ -48,7 +48,6 @@ def load_dgms( **kwargs):
     return dgms
 
 if __name__ == '__main__':
-    from Esme.dgms.fake import fake_diagrams
     from Esme.dgms.test import randomdgms
     dgms = randomdgms(10)
     kwargs = {'fil':'deg', 'fil_d':'sub', 'norm': False}

@@ -7,22 +7,29 @@ import dionysus as d
 import numpy as np
 
 def permute(dgm, seed=42):
+    """
+    :param dgm: diagram in dionysus form
+    :param seed:
+    :return:
+    """
+
     # dgm = randomdgms(10)[0]
     np.random.seed(seed)
-    tmp = dgm2diag(dgm)  # tmp is array
-    sample_pool = [p[0] for p in tmp] + [p[1] for p in tmp]
-    np.random.shuffle(sample_pool)
-    assert len(sample_pool) % 2 == 0
+    tmp = dgm2diag(dgm)  # tmp is a list of tuples
+    coordinates = [p[0] for p in tmp] + [p[1] for p in tmp]
+    np.random.shuffle(coordinates)
+    assert len(coordinates) % 2 == 0
+
     n_removed = 0
     diag = []
-    for i in range(0, len(sample_pool), 2):
-        b, d = sample_pool[i], sample_pool[i+1]
-        if abs(b-d) < 1e-3:
+    for i in range(0, len(coordinates), 2):
+        b, d = coordinates[i], coordinates[i+1]
+        if abs(b-d) < 1e-3: # dionysus does not allow points that is too close to diagonal
             n_removed += 1
             continue
         tmp = tuple((min(b, d), max(b, d)))
         diag.append(tmp)
-    assert len(diag) + n_removed == len(sample_pool)//2
+    assert len(diag) + n_removed == len(coordinates)//2
     return diag2dgm(diag)
 
 def permute_dgms(dgms):
@@ -35,7 +42,7 @@ def fake_diagram(g, cardinality = 2, attribute='deg', seed=42, true_dgm = 'null'
     random.seed(seed)
     sample_pool = nx.get_node_attributes(g, attribute).values()
 
-    if true_dgm!='null':
+    if true_dgm != 'null':
         tmp = dgm2diag(true_dgm) # tmp is array
         sample_pool = [p[0] for p in tmp] + [p[1] for p in tmp]
 

@@ -373,7 +373,6 @@ def edgefeat(g, fil='ricci', agg = 'min', norm = False):
     nodefeat = np.array(nodefeat).reshape(len(g),1)
     return nodefeat
 
-
 def nodefeat(g, fil, norm = False, **kwargs):
     """
     :param g:
@@ -564,8 +563,7 @@ if __name__ == '__main__':
     # print(nodefeat)
     # sys.exit()
 
-
-    gs, labels = load_graphs(dataset='reddit_binary')  # step 1
+    gs, labels = load_graphs(dataset='imdb_binary')  # step 1
     subdgms = gs2dgms_parallel(n_jobs=1, fil='jaccard', fil_d='sub', one_hom=False, debug_flag=True)  # step2 # TODO: need to add interface
     from Esme.dgms.stats import dgms_summary
     dgms_summary(subdgms)
