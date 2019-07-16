@@ -7,7 +7,7 @@ from Esme.dgms.fil import gs2dgms
 from Esme.dgms.stats import dgms_summary
 from Esme.dgms.arithmetic import add_dgms
 from Esme.dgms.vector import dgms2feature, merge_dgms
-from Esme.helper.load_graph import load_graphs, load_graphs_from_torch
+from Esme.helper.load_graph import load_graphs
 from Esme.ml.svm import classifier
 from Esme.dgms.fake import permute_dgms
 from Esme.dgms.kernel import sw, sw_parallel
@@ -17,8 +17,8 @@ from Esme.helper.debug import debug
 from joblib import Parallel, delayed
 from Esme.dgms.fil import g2dgm
 from Esme.dgms.ioio import dgms_dir_test, load_dgms, save_dgms
-# from Esme.graph.dataset.tu_dataset import load_tugraphs
-# from Esme.graph.dataset.tu_dataset import graphs_stat
+from Esme.graph.dataset.tu_dataset import load_tugraphs
+from Esme.graph.dataset.tu_dataset import graphs_stat
 
 from sacred import Experiment
 from sacred.observers import MongoObserver
@@ -29,7 +29,6 @@ client = MongoClient('localhost', 27017)
 EXPERIMENT_NAME = 'PD'
 YOUR_CPU = None  # None is the default setting and will result in using localhost, change if you want something else
 DATABASE_NAME = 'tda'
-
 ex = Experiment(EXPERIMENT_NAME)
 ex.observers.append(MongoObserver.create(url=YOUR_CPU, db_name=DATABASE_NAME))
 
@@ -50,22 +49,24 @@ def gs2dgms_parallel(n_jobs = 1, **kwargs):
     save_dgms(dgms, **kwargs)
     return dgms
 
-
-
 @ex.config
 def get_config():
+    # params for data
     fil = 'ricci'
     graph = 'mutag'
     norm = True
     permute = False
 
+    # params for diagram
     ss = True
     epd = False
     flip = False
 
+    # params for featuralization
     feat = 'sw'
-    feat_kwargs = {}
+    feat_kwargs = {'n_directions': 10, 'granularity':25, 'bw':1}
 
+    # params for classifier
     n_cv = 1
     clf = 'svm'
 
@@ -87,16 +88,9 @@ def main(graph, fil, norm, permute, ss, epd, n_cv, flip, feat, feat_kwargs):
     global gs
     print('kwargs', feat_kwargs)
     label_flag =  dgms_dir_test(fil=fil, fil_d='sub', norm=norm, graph = graph)[1]
-    print('Loading graphs...')
     # gs, labels = load_graphs(dataset=graph, labels_only=label_flag)  # step 1
-    gs, labels = load_graphs_from_torch(graph)
+    gs, labels = load_tugraphs(graph, labels_only=True)
 
-        # print(labels)
-        # graphs_stat(gs)
-        # gs, labels = load_tugraphs(graph, labels_only=True)
-        # print(labels)
-
-    # return
     # parallel
     subdgms = gs2dgms_parallel(n_jobs=-1, fil=fil, fil_d='sub', norm=norm, graph = graph)
     supdgms = gs2dgms_parallel(n_jobs=-1, fil=fil, fil_d='sup', norm=norm, graph = graph)
@@ -106,10 +100,9 @@ def main(graph, fil, norm, permute, ss, epd, n_cv, flip, feat, feat_kwargs):
     dgms = permute_dgms(dgms, permute_flag=permute)
     dgms_summary(dgms)
 
-    # vec
     swdgms = dgms2swdgms(dgms)
-
     if feat == 'sw':
+        print(feat_kwargs)
         k, _ = sw_parallel(swdgms, swdgms, parallel_flag=True, kernel_type='sw', **feat_kwargs)
         print(k.shape)
         clf = classifier(labels, labels, method='svm', n_cv=n_cv, kernel=k)
@@ -144,7 +137,6 @@ def main(graph, fil, norm, permute, ss, epd, n_cv, flip, feat, feat_kwargs):
         pass
 
 
-
 if __name__ == '__main__':
     ex.run_commandline()  # SACRED: this allows you to run Sacred not only from your terminal,
     sys.exit()
@@ -166,16 +158,15 @@ if __name__ == '__main__':
     dgms = permute_dgms(dgms, permute_flag=args.permute)
     dgms_summary(dgms)
 
-    # sw
+    # sw kernel
     swdgms = dgms2swdgms(dgms)
     kwargs = {'bw': args.bw, 'n_directions':10, 'K':1, 'p':1}
     sw_kernel, _ = sw_parallel(swdgms, swdgms, parallel_flag=True, kernel_type='sw',  **kwargs)
     print(sw_kernel.shape)
 
     clf = classifier(labels, labels, method='svm', n_cv=args.n_cv, kernel=sw_kernel)
-    clf.svm_kernel_(10)
+    clf.svm_kernel_(n_splits=10)
     print(clf.stat)
-    sys.exit()
 
 
 
