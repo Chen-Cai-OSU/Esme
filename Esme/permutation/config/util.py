@@ -7,7 +7,7 @@ from Esme.applications.motif.NRL.src.classification import ArgumentParser, Argum
 
 def get_experiment_config(config_path):
     with open(config_path, 'r') as conf:
-        return yaml.load(conf)
+        return yaml.load(conf, Loader=yaml.FullLoader)
 
 def product_dict(**kwargs):
     keys = kwargs.keys()
@@ -25,36 +25,33 @@ parser.add_argument("--permute", default='False', type=str, help='True, False')
 
 
 if __name__=='__main__':
+    # Handle the parameters when calling replicate.py
     args = parser.parse_args()
     feat=args.feat
     graph = args.graph
     fil = args.fil
-    file = os.path.realpath(__file__)
-    # res = get_experiment_config(os.path.join(file, '..',  'config', feat+'.yaml'))
-    config_file = '/home/cai.507/Documents/DeepLearning/Esmé/Esme/permutation/config/' + feat+'.yaml'
-    res = get_experiment_config(config_file)
-    # res = {'bw': {'format': 'values', 'values': [0.01, 0.1, 1], 'dtype': 'float'},
-    #        'n_d': {'format': 'values', 'values': [10], 'dtype': 'int'}
-    #        }
+    dir = os.path.dirname(__file__)
+    print(dir)
+
+    feat_dict = get_experiment_config(os.path.join(dir, feat + '.yaml')) # fead_dict = {'bw': {'format': 'values', 'values': [0.01, 0.1, 1], 'dtype': 'float'},...}
+
+    dict_ = {}
+    for key in feat_dict.keys():
+        tmp = {key: feat_dict[key]['values']}
+        dict_ = {**dict_, **tmp}
 
     python = "/home/cai.507/anaconda3/bin/python "
-    file = "/home/cai.507/Documents/DeepLearning/Esmé/Esme/permutation/replicate.py "
-
-    command = python + file + 'with graph=' + graph \
-              + ' fil=' + fil + ' '\
+    dir = "/home/cai.507/Documents/DeepLearning/Esmé/Esme/permutation/replicate.py "
+    command = python + dir + 'with graph=' + graph \
+              + ' fil=' + fil + ' ' \
               + 'feat=' + feat + ' ' \
               + 'flip=' + args.flip + ' ' \
               + 'epd=' + args.epd + ' ' \
               + 'permute=' + args.permute + ' '
 
-    dict_ = {}
-    for key in res.keys():
-        tmp = {key: res[key]['values']}
-        dict_ = {**dict_, **tmp}
-
     for d in product_dict(**dict_):
         suffix = ''
         for k in d.keys():
-            suffix += 'feat_kwargs.' + str(k) + '=' + str(d[k]) +' ' # append feat_kwargs.key=val
+            suffix += 'feat_kwargs.' + str(k) + '=' + str(d[k]) + ' ' # append feat_kwargs.key=val
         print(command + suffix)
         os.system(command + suffix)
