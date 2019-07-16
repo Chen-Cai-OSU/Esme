@@ -64,7 +64,6 @@ if __name__ == '__main__':
 
     print('Collections of {} db: {}'.format(db.name, db.list_collection_names()))
     one_graph(db, graph='nci1')
-    sys.exit()
 
     # Get the COMPLETED experiments with dim<=100 and val. accuracy > 85%
     # query = 'fil=="deg" and n_cv ==1 and permute==False and _id > 20 and status=="COMPLETED" and (graph == "imdb_binary" or graph=="imdb_multi" or graph=="nci1")'

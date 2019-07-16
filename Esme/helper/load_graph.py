@@ -1,18 +1,14 @@
 import pickle
 import os
-import os.path as osp
 import time
 import numpy as np
 import networkx as nx
 import sys
 
-
 from Esme.helper.io import make_dir
 from Esme.helper.time import timefunction
 from Esme.helper.format import precision_format
-from torch_geometric.datasets import TUDataset
-from Esme.graph.dataset.tu_dataset import torch_geometric_2nx, name_conversion
-@timefunction
+
 def load_existing_graph(graph, file):
     start = time.time()
 
@@ -32,7 +28,6 @@ def load_existing_graph(graph, file):
         if graph == 'ptc': graphs[151] = graphs[152] # small hack
         return graphs, labels
 
-
 def load_graph(graph, debug=False, single_graph_flag=True):
     # exptect label to be numpy.ndarry of shape (n,). However protein_data is different so have to handle it differently
     """
@@ -41,7 +36,7 @@ def load_graph(graph, debug=False, single_graph_flag=True):
     :param single_graph_flag:
     :return: graphs and lables
     """
-
+    print('Loading graphs...')
     assert type(graph) == str
     dir = os.path.join('/home/cai.507/Documents/DeepLearning/deep-persistence', graph, 'LearningFiltration')
     make_dir(dir)
@@ -168,18 +163,6 @@ def component_graphs(g, threshold = 4):
         components = [g_ for g_ in components if len(g_) >= threshold]
         components = [nx.convert_node_labels_to_integers(g_) for g_ in components]
         return components
-
-
-def load_graphs_from_torch(graph):
-    path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', graph)
-    make_dir(path)
-    graph = name_conversion(graph)
-    dataset = TUDataset(path, name=graph)
-
-
-    print('Loading graph from path %s'%path)
-    graphs, labels = torch_geometric_2nx(dataset)
-    return graphs, labels
 
 if __name__=='__main__':
     graphs_dict, labels = load_graph('mutag')

@@ -1,3 +1,5 @@
+""" old code """
+
 from __future__ import print_function
 
 # sys.path.append('/home/cai.507/Documents/DeepLearning/deep-persistence/pythoncode/permutation')
