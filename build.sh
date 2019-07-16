@@ -1,18 +1,9 @@
 #!/usr/bin/env bash
-python=/Users/baidu/anaconda3/bin/python
-file=/Users/baidu/Documents/Esme/Esme/permutation/replicate.py
+python=~/anaconda3/bin/python
+pip=~/anaconda3/bin/pip
 
-platform='unknown'
-unamestr=`uname`
-echo $unamestr
+$python setup.py sdist bdist_wheel
+$pip install .
 
-if [[ "$unamestr" == 'Linux' ]]; then
-    /home/cai.507/anaconda3/bin/python setup.py sdist bdist_wheel
-    /home/cai.507/anaconda3/bin/pip install .
-elif [[ "$unamestr" == 'Darwin' ]]; then
-    sudo $python setup.py install
-    sudo $python $file
-fi
-
-
-
+#/home/cai.507/anaconda2/bin/python setup.py sdist bdist_wheel
+#/home/cai.507/anaconda2/bin/pip install .
