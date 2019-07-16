@@ -8,6 +8,8 @@ import torch_geometric.transforms as T
 import numpy as np
 import networkx as nx
 import argparse
+from Esme.dgms.fil import gs2dgms
+from Esme.dgms.stats import dgms_summary
 
 from torch_geometric.data import InMemoryDataset, download_url, extract_zip
 from torch_geometric.read import read_tu_data
@@ -185,19 +187,22 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--graph', type=str, default='MUTAG', help="graph dataset")
 if __name__ == '__main__':
     # sys.argv = []
+
     max_nodes = 300
     args = parser.parse_args()
     print(args)
-    # sys.exit()
     class MyFilter(object):
         def __call__(self, data):
             return data.num_nodes <= max_nodes
 
     path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', args.graph)
+    # path = '/home/cai.507/Documents/DeepLearning/Esmé/Esme/graph/dataset/../data/MUTAG'
+    # dataset = TUDataset(path, name=args.graph, transform=T.ToDense(max_nodes))
     dataset = TUDataset(path, name=args.graph)
 
     print(int(dataset[1].y[0]))
     graphs, labels = torch_geometric_2nx(dataset)
     graphs_stat(graphs)
-    print(labels)
 
+    subdgms = gs2dgms(graphs, n_jobs=1, fil='deg', fil_d='sub', one_hom=False, debug_flag=True)
+    dgms_summary(subdgms)

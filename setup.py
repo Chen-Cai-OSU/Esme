@@ -17,7 +17,9 @@ setuptools.setup(
         "networkx",
         "dionysus",
         "sklearn",
-        "joblib"
+        "joblib",
+        'cvxpy',
+        'torch_geometric'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
