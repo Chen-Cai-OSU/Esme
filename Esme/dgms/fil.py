@@ -1,4 +1,5 @@
 """ Implement different filtration stradegies for graphs """
+
 import sys
 
 import dionysus as d
@@ -569,7 +570,7 @@ if __name__ == '__main__':
     dgms_summary(subdgms)
     debug(subdgms, 'subdgms')
     sys.exit()
-    # cycle_graph(20)
+
     g = nx.random_geometric_graph(10, 0.4)
     print(edgefeat(g, fil='jaccard'))
     sys.exit()

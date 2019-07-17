@@ -4,7 +4,6 @@ from joblib import Parallel, delayed
 from Esme.dgms.fil import nodefeat, fil_stradegy, graph2dgm
 from Esme.helper.time import timefunction
 
-
 # @timefunction
 def parallel_cg(n_jobs=-1):
     # g = nx.random_geometric_graph(100, 0.2)

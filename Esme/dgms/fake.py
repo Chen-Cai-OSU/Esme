@@ -1,3 +1,7 @@
+"""
+functions related to generate fake diagrams from true diagrams
+"""
+
 from Esme.dgms.format import dgm2diag, diag2dgm
 from Esme.dgms.test import randomdgms
 from Esme.dgms.stats import print_dgm

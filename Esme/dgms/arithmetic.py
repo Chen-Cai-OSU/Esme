@@ -1,3 +1,6 @@
+"""
+functions to maniputate persistence diagrams
+"""
 import dionysus as d
 from Esme.dgms.format import dgm2diag, diag2dgm, array2diag
 import numpy as np

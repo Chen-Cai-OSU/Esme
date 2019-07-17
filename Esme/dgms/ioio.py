@@ -1,18 +1,20 @@
-# subdgms = gs2dgms_parallel(n_jobs=-1, fil=fil, fil_d='sub', norm=norm)
+"""
+functions related to input and output
+"""
 
 import os
 import os.path as osp
 from Esme.helper.io import make_dir
 from Esme.dgms.format import dgms2diags, export_dgm, load_dgm, print_dgm
+from Esme.helper.others import assert_names
 
 def dgms_dir_test(**kwargs):
     """ return True if dgms have already been computed """
-    assert 'fil' in kwargs.keys()
-    assert 'graph' in kwargs.keys()
-    # assert 'fil_d' in kwargs.keys()
-    assert 'norm' in kwargs.keys()
+
+    assert_names(['fil', 'graph', 'norm'], kwargs)
     dir = osp.dirname(osp.realpath(__file__))
     dir = osp.join(dir, '..', '..', 'save_dgms')
+
     try:
         dir = osp.join(dir, kwargs['graph'], kwargs['fil'], kwargs['fil_d'], 'norm_' + str(kwargs['norm']), '')
     except:
@@ -25,7 +27,7 @@ def dgms_dir_test(**kwargs):
         print('No existing csv files')
         n = 0
 
-    if n==0:
+    if n == 0:
         return dir, False
     else:
         return dir, True # there exists dgms

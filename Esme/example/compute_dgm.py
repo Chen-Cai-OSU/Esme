@@ -19,6 +19,8 @@ def gs2dgms_parallel(n_jobs = 1, **kwargs):
 
 if __name__ == '__main__':
     gs, labels = load_graphs(dataset='imdb_binary')  # step 1
+
+
     subdgms = gs2dgms_parallel(n_jobs=1, fil='jaccard', fil_d='sub', one_hom=False, debug_flag=True)  # step2 # TODO: need to add interface
     dgms_summary(subdgms)
     debug(subdgms, 'subdgms')

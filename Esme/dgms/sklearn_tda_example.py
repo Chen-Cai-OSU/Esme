@@ -1,7 +1,8 @@
+""" sklearn tda examples."""
+
 import sklearn_tda as tda
 import matplotlib.pyplot as plt
 import numpy as np
-
 
 def sklearn_tda():
     def arctan(C, p):

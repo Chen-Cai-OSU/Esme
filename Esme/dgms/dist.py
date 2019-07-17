@@ -1,3 +1,7 @@
+"""
+functions related to distance between diagrams
+"""
+
 import dionysus as d
 import numpy as np
 from scipy.spatial.distance import cdist

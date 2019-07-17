@@ -1,3 +1,7 @@
+"""
+functions to compute persistence diagrams. Old code.
+"""
+
 import time
 import json
 import os
@@ -242,7 +246,7 @@ def wrapper_getdiagram(g, parallel_flag=True, zigzag = False):
 def alldgms(gs, radius=1, n = 100, dataset = 'blogcatalog', recompute_flag=False, method = 'serial', verbose = 5, zigzag = False):
     """
     :param gs:  a list of egographs
-    :param radius: radius of egograph. #todo not very useful.
+    :param radius: radius of egograph. # todo not very useful.
     :param n:
     :param dataset:
     :param recompute_flag: whether to recompute or not
@@ -267,7 +271,6 @@ def alldgms(gs, radius=1, n = 100, dataset = 'blogcatalog', recompute_flag=False
 
     except IOError or FileNotFoundError:
         kwargs_ = {'key': 'fv', 'subflag': 'True', 'one_homology_flag': False}
-
         if method == 'parallel':
             diags = Parallel(n_jobs=-1, verbose=verbose)(delayed(wrapper_getdiagram)(g, zigzag=zigzag) for g in gs)  # the cpu usage is only 250%. TODO: optimize
             dgms = diags2dgms(diags)

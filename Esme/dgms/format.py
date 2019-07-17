@@ -1,3 +1,6 @@
+"""
+A few auxliary functions realted to formatting diagrams.
+"""
 import csv
 import os
 import time

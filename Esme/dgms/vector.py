@@ -1,3 +1,5 @@
+""" functions for converting diagrams to vector """
+
 import os
 import numpy as np
 import networkx as nx
@@ -6,15 +8,14 @@ import time
 import sys
 from sklearn.preprocessing import normalize
 from joblib import Parallel, delayed
-import time
 import sklearn_tda as tda
+import time
 
 from Esme.helper.stat import statfeat
 from Esme.dgms.format import dgms2diags, dgm2diag
 from Esme.helper.format import precision_format, rm_zerocol, normalize_
 from Esme.helper.others import filterdict
 from Esme.dgms.format import flip_dgms, assert_dgms_above
-
 
 def unwrap_pdvector(*arg, **kwarg):
     # http://qingkaikong.blogspot.com/2016/12/python-parallel-method-in-class.html
@@ -179,7 +180,7 @@ class pdvector():
         X = normalize(X, norm='l2', axis=axis, copy=True)
         return X
 
-def dgms2feature(dgms, vectype='pi', graphs = None, verbose = 0, **params):
+def dgms2vec(dgms, vectype='pi', graphs = None, verbose = 0, **params):
     """
     :param dgms: a list of dgms
     :param vectype: pi, pl, pvector
@@ -221,7 +222,17 @@ def dgms2feature(dgms, vectype='pi', graphs = None, verbose = 0, **params):
 
     return vecs
 
-def merge_dgms(subdgms, superdgms, epddgms, vectype='pi', ss = False, epd = False, **params):
+def merge_dgms(subdgms, superdgms, epddgms = None, vectype='pi', ss = False, epd = False, **params):
+    """
+    :param subdgms:     dgms computed from sublevel filtrations
+    :param superdgms:   dgms computed from superlevel filtrations
+    :param epddgms:     dgms computed from extend persistence diagram
+    :param vectype:     pi(persistence image), pl(landscape), pvector
+    :param ss:          if true, concatenate sub/super diagram
+    :param epd:         if true, concatenate extended persistence diagram
+    :param params:      params for dgm2vec
+    :return:
+    """
     # merge feature vector of sub_dgms and super_dgms
 
     superdgms = flip_dgms(superdgms)
@@ -229,11 +240,11 @@ def merge_dgms(subdgms, superdgms, epddgms, vectype='pi', ss = False, epd = Fals
     assert_dgms_above(superdgms)
     assert_dgms_above(epddgms)
 
-    sub_vec = dgms2feature(subdgms, vectype=vectype, **params)
-    super_vec = dgms2feature(superdgms, vectype=vectype, **params)
+    sub_vec = dgms2vec(subdgms, vectype=vectype, **params)
+    super_vec = dgms2vec(superdgms, vectype=vectype, **params)
     if epddgms is not None:
         assert len(epddgms) == len(subdgms) == len(superdgms)
-        epd_vec = dgms2feature(epddgms, vectype=vectype, **params)
+        epd_vec = dgms2vec(epddgms, vectype=vectype, **params)
 
     if ss:
         if epd:
@@ -245,7 +256,9 @@ def merge_dgms(subdgms, superdgms, epddgms, vectype='pi', ss = False, epd = Fals
 
 
 def dgm_statfeat(dgm):
-    """ stats feat of a dgm """
+    """ stats feat of a dgm. Concatenation of stats of birth/death/life time
+    """
+
     # dgm = d.Diagram([(2, 3), (3, 4)])
     diag = dgm2diag(dgm)
     birthtime = [p[0] for p in diag]
@@ -254,24 +267,23 @@ def dgm_statfeat(dgm):
     feat = np.concatenate((statfeat(birthtime), statfeat(deathtime), statfeat(lifetime)))
     return feat
 
-
 if __name__ == '__main__':
     dgm = d.Diagram([(2,3), (3,4)])
     dgms = [dgm] * 10
     labels = np.array([1, -1]*50)
 
     params = {'bandwidth': 1.0, 'weight': (1, 1), 'im_range': [0, 1, 0, 1], 'resolution': [5, 5]}
-    image = dgms2feature(dgms, vectype='pi', **params)
-    images = merge_dgms(dgms, dgms, vectype='pi', **params)
+    image = dgms2vec(dgms, vectype='pi', **params)
+    images = merge_dgms(dgms, dgms, dgms, ss=True, epd=True, vectype='pi', **params)
     print (np.shape(image), np.shape(images))
 
     params = {'num_landscapes': 5, 'resolution': 100}
-    landscape = dgms2feature(dgms, vectype='pl', **params)
-    landscapes = merge_dgms(dgms, dgms, vectype='pl', **params)
+    landscape = dgms2vec(dgms, vectype='pl', **params)
+    landscapes = merge_dgms(dgms, dgms, dgms, vectype='pl', **params)
     print (np.shape(landscape), np.shape(landscapes))
 
-    pd_vector = dgms2feature(dgms, vectype = 'pvector')
-    pd_vectors = merge_dgms(dgms, dgms, vectype = 'pvector')
+    pd_vector = dgms2vec(dgms, vectype ='pvector')
+    pd_vectors = merge_dgms(dgms, dgms, dgms, vectype = 'pvector')
     print (np.shape(pd_vector), np.shape(pd_vectors))
     sys.exit()
 

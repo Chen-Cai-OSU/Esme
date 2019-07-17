@@ -1,3 +1,5 @@
+""" functons related to statistics of persistence diagrams. """
+
 import numpy as np
 from Esme.helper.format import precision_format as pf
 
