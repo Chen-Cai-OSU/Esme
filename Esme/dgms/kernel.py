@@ -37,12 +37,16 @@ def sw(dgms1, dgms2, kernel_type='sw', parallel_flag=False, **featkwargs):
         elif kernel_type == 'wg':
             assert_names(['bw', 'K', 'p'], featkwargs)
             tda_kernel = tda.PersistenceWeightedGaussianKernel(bandwidth=featkwargs['bw'], weight=arctan(featkwargs['K'], featkwargs['p']))
+        elif kernel_type ==  'pf':
+            assert_names(['bw', 'bwf'], featkwargs)
+            tda_kernel = tda.PersistenceFisherKernel(bandwidth_fisher=featkwargs['bwf'], bandwidth=featkwargs['bw'])
         else:
             print ('Unknown kernel for function sw')
 
         diags1 = dgms1; diags2 = dgms2
         X = tda_kernel.fit(diags1)
         Y = tda_kernel.transform(diags2)
+        # Y = np.nan_to_num(Y) # todo wait for mathieu's reply
         return Y
 
 @timefunction
@@ -110,11 +114,13 @@ def random_dgms(n=10):
 if __name__ == '__main__':
     dgms1 = generate_swdgm(100)
 
-    dummy_kwargs = {'n_directions':10, 'bw':1}
-    serial_kernel = sw_parallel(dgms1, dgms1, kernel_type='sw', parallel_flag=False, **dummy_kwargs)[0]
-    parallel_kernel = sw_parallel(dgms1, dgms1, kernel_type='sw', parallel_flag=True, **dummy_kwargs)[0]
-
+    # dummy_kwargs = {'n_directions':10, 'bw':1}
+    dummy_kwargs = {'bwf':1, 'bw':1}
+    serial_kernel = sw_parallel(dgms1, dgms1, kernel_type='pf', parallel_flag=False, **dummy_kwargs)[0]
+    parallel_kernel = sw_parallel(dgms1, dgms1, kernel_type='pf', parallel_flag=True, **dummy_kwargs)[0]
+    print(serial_kernel, parallel_kernel)
     diff = serial_kernel - parallel_kernel
+    print(f'max diff is {np.max(diff)}' )
     assert np.max(diff) < 1e-5
     sys.exit()
 
