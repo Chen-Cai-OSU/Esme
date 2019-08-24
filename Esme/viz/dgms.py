@@ -7,7 +7,12 @@ from scipy.stats import kde
 from Esme.dgms.format import dgms2swdgms
 from Esme.dgms.test import randomdgms
 import dionysus as d
-from Esme.dgms.vector import dgms2feature, merge_dgms
+from Esme.dgms.vector import dgms2vec, merge_dgms
+from Esme.graph.dataset.tu_dataset import load_tugraphs
+from Esme.dgms.fil import gs2dgms, gs2dgms_parallel
+from Esme.dgms.fake import permute_dgms
+from Esme.dgms.kernel import sw, sw_parallel
+from Esme.dgms.format import print_dgm
 
 
 def density(data):
@@ -43,7 +48,7 @@ def viz_vector():
     dgms = [dgm] * 2
 
     params = {'bandwidth': 1.0, 'weight': (1, 1), 'im_range': [0, 1, 0, 1], 'resolution': [5, 5]}
-    image = dgms2feature(dgms, vectype='pi', **params)
+    image = dgms2vec(dgms, vectype='pi', **params)
     images = merge_dgms(dgms, dgms, vectype='pi', **params)
     print(np.shape(image), np.shape(images))
 
@@ -56,6 +61,36 @@ def viz_vector():
 
 
 if __name__ == '__main__':
+
+    # fake fake test
+    graph = 'reddit_binary'
+    norm = True
+    fil = 'ricci'
+    gs, labels = load_tugraphs(graph)
+    # subdgms = gs2dgms(gs, fil=fil, fil_d='sub', norm=norm, graph = graph, ntda = False, debug_flag = False)
+    subdgms = gs2dgms_parallel(gs, fil=fil, fil_d='sub', norm=norm, graph=graph, ntda=False, debug_flag=False)
+
+    true_dgms = subdgms
+    fake_dgms = permute_dgms(true_dgms, permute_flag=True, seed=42)
+    another_fake_dgms = permute_dgms(true_dgms, permute_flag=True, seed=41)
+
+    print_dgm(true_dgms[0])
+    print('-'*20)
+    print_dgm(fake_dgms[0])
+    print('-' * 20)
+    print_dgm(another_fake_dgms[0])
+    sys.exit()
+
+
+    all_dgms = true_dgms + fake_dgms
+    all_dgms = dgms2swdgms(all_dgms)
+
+    feat_kwargs = {'n_directions': 10, 'bw':1}
+    k, _ = sw_parallel(all_dgms, all_dgms, parallel_flag=True, kernel_type='sw', **feat_kwargs)
+
+    print(k.shape)
+
+    sys.exit()
     viz_vector()
     sys.exit()
     data = np.random.multivariate_normal([0, 0], [[1, 0.5], [0.5, 3]], 200)
