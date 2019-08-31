@@ -19,7 +19,6 @@ class MyTransform(object):
         data.y = data.y[:, target]
         return data
 
-
 class Complete(object):
     def __call__(self, data):
         device = data.edge_index.device
@@ -45,7 +44,7 @@ class Complete(object):
 
         return data
 
-def torch_geometric_2nx(dataset):
+def torch_geometric_2nx(dataset, print_flag = False):
     graphs, labels = [], []
     for i in range(len(dataset)):
         edges = dataset[i].edge_index # tensor of shape [2, n_edges * 2]
@@ -56,13 +55,17 @@ def torch_geometric_2nx(dataset):
         g  = nx.from_edgelist(edges_lis)
         graphs.append(g)
         labels.append(int(dataset[i].y[0]))
+        if print_flag: print(i)
     return graphs, labels
 
 def graphs_stat(graphs):
     print('graphs is of length %s' % len(graphs))
     length_list = list(map(len, graphs))
+    edge_len_list = [len(graph.edges()) for graph in graphs]
     m = np.mean(length_list)
-    print('The average number of nodes is %s'%m)
+    n = np.mean(edge_len_list)
+    print(f'The average number of nodes is {m} and average number of edges is {n}')
+
 
 
 if __name__ == '__main__':

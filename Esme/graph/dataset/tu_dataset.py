@@ -10,10 +10,11 @@ import networkx as nx
 import argparse
 from Esme.dgms.fil import gs2dgms
 from Esme.dgms.stats import dgms_summary
+from Esme.graph.dataset.modelnet import modelnet2graphs
 
 from torch_geometric.data import InMemoryDataset, download_url, extract_zip
 from torch_geometric.read import read_tu_data
-
+from Esme.graph.generativemodel import sbms
 class TUDataset(InMemoryDataset):
     r"""A variety of graph kernel benchmark datasets, *.e.g.* "IMDB-BINARY",
     "REDDIT-BINARY" or "PROTEINS", collected from the `TU Dortmund University
@@ -40,7 +41,7 @@ class TUDataset(InMemoryDataset):
             (default: :obj:`False`)
     """
 
-    url = 'https://ls11-www.cs.uni-dortmund.de/people/morris/graphkerneldatasets'
+    url = 'https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets'
 
     def __init__(self,
                  root,
@@ -151,24 +152,43 @@ def graphs_stat(graphs, verbose = 0):
         print(edge_length_list)
 
 def load_tugraphs(graph='mutag', labels_only = False):
-    graph = name_conversion(graph)
-    max_nodes = 300
-    # sys.exit()
-    class MyFilter(object):
-        def __call__(self, data):
-            return data.num_nodes <= max_nodes
 
+    # load synthetic sbm graphs
+    if graph[:3] == 'syn':
+        scale = int(graph[3:])
+        n = 750
+        p, q = 0.5, 0.1
+        p_, q_ = 0.4, 0.2
+        gs1 = sbms(n=n, n1=100 * scale, n2=50 * scale, p=p, q=q)
+        gs2 = sbms(n=n, n1=75 * scale, n2=75 * scale, p=p, q=q)
+        graphs = gs2 + gs1
+        labels = [1] * n + [2] * n
+        return graphs, labels
+
+    graph = name_conversion(graph)
     path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', graph)
     dataset = TUDataset(path, name=graph)
     graphs, labels = torch_geometric_2nx(dataset, labels_only)
     return graphs, labels
 
+def load_shapegraphs(graph = 'mn10'):
+    if graph=='mn10':
+        graphs, labels = modelnet2graphs(version='10', print_flag=True)
+    elif graph=='mn40':
+        graphs, labels = modelnet2graphs(version='40', print_flag = True)
+    else:
+        raise Exception(f'No such graph {graph}')
+    return graphs, labels
+
 def name_conversion(graph='mutag'):
+
     # change mutag to MUTAG. reddit_5K to REDDIT-MULTI-5K
-    if graph in ['mutag', 'nci1', 'nci109', 'collab']:
+    if graph in ['mutag', 'nci1', 'nci109', 'collab', 'cox2', 'dhfr', 'frankenstein','bzr']:
         return graph.upper()
     elif graph == 'reddit_5K':
         return 'REDDIT-MULTI-5K'
+    elif graph == 'reddit_binary':
+        return 'REDDIT-BINARY'
     elif graph == 'reddit_12K':
         return 'REDDIT-MULTI-12K'
     elif graph == 'imdb_binary':
@@ -179,28 +199,51 @@ def name_conversion(graph='mutag'):
         return 'PROTEINS'
     elif graph == 'ptc':
         return 'PTC_MR'
+    elif graph == 'dd_test':
+        return 'DD'
     else:
         raise Exception('No such graph %s'%graph)
+
+def ave_diameter(gs):
+    """ average diameter of a list of nx graphs """
+    # g = nx.random_geometric_graph(100,0.1)
+    # gs = [g] * 10
+    gs = [max(nx.connected_component_subgraphs(g), key=len) for g in gs]
+    diameters = [nx.diameter(g) for g in gs]
+    return {'mean': np.mean(diameters), 'std': np.std(diameters)}
+
+def diameter_stats():
+    res ={'cox2': {'mean': 13.790149892933618, 'std': 1.0382767487921656}, 'nci109': {'mean': 13.123334141022534, 'std': 5.308880028163508}, 'dhfr': {'mean': 14.603174603174603, 'std': 2.582232838035949}, 'frankenstein': {'mean': 8.474752132810698, 'std': 4.288572881190721}, 'imdb_binary': {'mean': 1.861, 'std': 0.3459465276599839}, 'imdb_multi': {'mean': 1.474, 'std': 0.49932354240512244}, 'mutag': {'mean': 8.21808510638298, 'std': 1.8422617208410026}, 'ptc': {'mean': 7.523255813953488, 'std': 4.586321280508768}, 'nci1': {'mean': 13.309489051094891, 'std': 5.5376246791257975}, 'dd_test': {'mean': 19.8981324278438, 'std': 7.718067787093092}}
+
+    return res
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--graph', type=str, default='MUTAG', help="graph dataset")
-if __name__ == '__main__':
-    # sys.argv = []
 
-    max_nodes = 300
+if __name__ == '__main__':
+    modelnet2graphs('10')
+    sys.exit()
+    diameters = dict()
+    for gname in ['cox2', 'nci109',  'dhfr', 'frankenstein','imdb_binary', 'imdb_multi', 'mutag', 'ptc' ,'nci1', 'dd_test', 'reddit_binary', 'reddit_5K',]:
+        gs, labels = load_tugraphs(gname)
+        diameters[gname] = ave_diameter(gs)
+        print(diameters)
+
+
+    sys.exit()
+    print(len(gs))
+    # sys.argv = []
+    max_nodes = 30000
     args = parser.parse_args()
     print(args)
     class MyFilter(object):
         def __call__(self, data):
             return data.num_nodes <= max_nodes
 
-    path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', args.graph)
-    # path = '/home/cai.507/Documents/DeepLearning/Esmé/Esme/graph/dataset/../data/MUTAG'
-    # dataset = TUDataset(path, name=args.graph, transform=T.ToDense(max_nodes))
-    dataset = TUDataset(path, name=args.graph)
+    path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', args.graph) # path = '/home/cai.507/Documents/DeepLearning/Esmé/Esme/graph/dataset/../data/MUTAG'
+    dataset = TUDataset(path, name=args.graph) # dataset = TUDataset(path, name=args.graph, transform=T.ToDense(max_nodes))
 
-    print(int(dataset[1].y[0]))
     graphs, labels = torch_geometric_2nx(dataset)
     graphs_stat(graphs)
 

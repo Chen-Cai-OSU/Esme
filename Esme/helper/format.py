@@ -8,6 +8,8 @@ def almostequal(x,y, threshold=1e-2):
     else:
         return False
 
+def print_line(n = 150):
+    print('-'*n)
 
 def precision_format(nbr, precision=1):
     # assert type(nbr)==float

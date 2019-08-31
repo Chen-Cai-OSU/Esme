@@ -5,7 +5,7 @@ import numpy as np
 import networkx as nx
 import sys
 
-from Esme.helper.io import make_dir
+from Esme.helper.io_related import make_dir
 from Esme.helper.time import timefunction
 from Esme.helper.format import precision_format
 
