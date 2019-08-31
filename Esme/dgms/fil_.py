@@ -11,17 +11,13 @@ from networkx.linalg.algebraicconnectivity import fiedler_vector
 from Esme import graphonlib
 from Esme.dgms.arithmetic import add_dgm
 from Esme.dgms.format import dgm2diag, flip_dgm
-from Esme.dgms.stats import dgms_summary
-from Esme.dgms.stats import print_dgm
+from Esme.dgms.stats import dgms_summary, print_dgm, dgm_filter
 from Esme.graph.OllivierRicci import ricciCurvature
 from Esme.graphonlib.smoothing.zhang import smoother
 from Esme.helper.debug import debug
 from Esme.helper.load_graph import component_graphs
 from Esme.helper.load_graph import load_graphs
 from Esme.helper.time import timefunction
-from Esme.dgms.fake import array2dgm
-from Esme.dgms.ioio import dgms_dir_test, load_dgms, save_dgms
-np.random.seed(42)
 
 class fil_stradegy():
     def __init__(self, g, fil = 'combined', node_fil = 'sub', edge_fil = 'sup', **kwargs):
@@ -47,9 +43,9 @@ class fil_stradegy():
         # set node feat for graph
 
         if func == 'random':
-            self.nodefeat_ = np.random.random((self.g, 1))
+            self.nodefeat_ = np.random.random((self.n, 1))
         else:
-            self.nodefeat_ = nodefeat
+            self.nodefeat_ = nodefeat # TODO: should call nodefeat function
 
     def edgefeat(self, func = None, **kwargs):
         # implement a few common edge vals
@@ -57,7 +53,7 @@ class fil_stradegy():
         edgefeat = np.zeros((self.n, self.n))
         if func == 'jaccard':
             edgefeat= nx.jaccard_coefficient(self.g, list(self.g.edges))
-        elif func == 'edge_prob':
+        elif func == 'edge_p':
             adj = nx.adjacency_matrix(self.g).todense()
             edgefeat = graphonlib.smoothing.zhang.smoother(adj, h=kwargs.get('h', 0.3))  # h : neighborhood size parameter. Example: 0.3 means to include
         else:
@@ -67,6 +63,10 @@ class fil_stradegy():
         self.edge_fil = kwargs['edge_fil']
 
     def build_fv(self, **kwargs):
+        """
+        :param kwargs:
+        :return: a networkx where node value and edge value are computed
+        """
         if self.fil == 'combined':
             assert self.nodefeat_ is not None
             assert self.edgefeat_ is not None
@@ -152,7 +152,6 @@ class graph2dgm():
     def compute_PD(self, simplices, sub=True, inf_flag='False', zigzag = False):
         def cmp(a, b):
             return (a > b) - (a < b)
-
         def compare(s1, s2, sub_flag=True):
             if sub_flag == True:
                 if s1.dimension() > s2.dimension():
@@ -163,7 +162,6 @@ class graph2dgm():
                     return cmp(s1.data, s2.data)
             elif sub_flag == False:
                 return -compare(s1, s2, sub_flag=True)
-
         def zigzag_less(x, y):
             # x, y are simplex
             dimx, datax = x.dimension(), x.data
@@ -309,7 +307,8 @@ class graph2dgm():
             print_dgm(dgm)
         return dgm
 
-def _edgefeat(g, norm = False, fil='ricci'):
+#####
+def edgefeat(g, norm = False, fil='ricci'):
     """
     wrapper for edge_probability and ricciCurvature computation
     :param g: graph
@@ -343,39 +342,6 @@ def _edgefeat(g, norm = False, fil='ricci'):
     if norm: gp = gp / float(max(abs(gp)))
     return gp
 
-def edgefeat(g, fil='ricci', agg = 'min', norm = False):
-    """ if edge values is defined, we can sepcify how node value is defined.
-    For example agg should be min for sublevel filtration while max for superlevel
-    after function.
-
-    :param g: a networkx graph
-    :param fil: edge_p/ricci/jaccard
-    :param agg: min/max/ave. How edge value is defined from node value
-    :return: a node feature of shape (len(g), 1)
-    """
-    g = nx.convert_node_labels_to_integers(g)
-    assert nx.is_connected(g)
-    assert agg in ['min', 'max', 'ave']
-    if agg == 'min':
-        op = lambda x: min(x)
-    elif agg == 'max':
-        op = lambda x: max(x)
-    elif agg == 'ave':
-        op = lambda x: np.average(x)
-    else:
-        raise Exception('Such aggreation %s is not supported'%agg)
-
-    gp = _edgefeat(g, fil=fil, norm=norm)
-    # print('gp', gp)
-    # print('nodes',g.nodes())
-    nodefeat = []
-    for v in g.nodes():
-        v_nbr = list(nx.neighbors(g,v))
-        v_list = [gp[v][nbr] for nbr in v_nbr]
-        nodefeat.append(op(v_list))
-    nodefeat = np.array(nodefeat).reshape(len(g),1)
-    return nodefeat
-
 def nodefeat(g, fil, norm = False, **kwargs):
     """
     :param g:
@@ -402,50 +368,52 @@ def nodefeat(g, fil, norm = False, **kwargs):
         nodefeat = fiedler_vector(g, normalized=False)  # np.ndarray
         nodefeat = nodefeat.reshape(len(g), 1)
     elif fil == 'ricci':
-        try:
-            g = ricciCurvature(g, alpha=0.5, weight='weight')
-            ricci_dict = nx.get_node_attributes(g, 'ricciCurvature')
-            ricci_list = [ricci_dict[i] for i in range(len(g))]
-            nodefeat = np.array(ricci_list).reshape((len(g), 1))
-        except:
-            nodefeat = np.random.random((len(g),1)) # cvxpy.error.SolverError: Solver 'ECOS' failed. Try another solver.
-    elif fil[:3] == 'hks':
-        assert fil[3] == '_'
-        t = float(fil[4:])
-        from Esme.dgms.hks import hks
-        nodefeat = hks(g, t)
+        g = ricciCurvature(g, alpha=0.5, weight='weight')
+        ricci_dict = nx.get_node_attributes(g, 'ricciCurvature')
+        ricci_list = [ricci_dict[i] for i in range(len(g))]
+        nodefeat = np.array(ricci_list).reshape((len(g), 1))
     else:
         raise Exception('No such filtration: %s'%fil)
     assert nodefeat.shape == (len(g), 1)
-
 
     # normalize
     if norm: nodefeat = nodefeat / float(max(abs(nodefeat)))
     return nodefeat
 
-def node_fil(g = None, fil = 'deg', norm = False, one_hom = False, **kwargs):
-    """
-    sublevel filtration
-    :param g: graph
-    :param fil: filtration type. Deg, cc, ricciCurvature where fv is normalized.
-    :param norm: whether normalize fv
-    :param kwargs: i: index of global gs
-    :return: Persistence diagram.
-    """
-    # if g is None:
-    #     assert 'gs' in globals().keys()
-    #     i = kwargs['i']
-    #     g = gs[i]
+def efeat2nfeat(g, fil='ricci', agg ='min', norm = False):
+    """ if edge values is defined, we can sepcify how node value is defined.
+    For example agg should be min for sublevel filtration while max for superlevel
+    after function.
 
+    :param g: a networkx graph
+    :param fil: edge_p/ricci/jaccard
+    :param agg: min/max/ave. How edge value is defined from node value
+    :return: a node feature of shape (len(g), 1)
+    """
     g = nx.convert_node_labels_to_integers(g)
-    nodefeat_ = nodefeat(g, fil, norm=norm, **kwargs)
-    fil = fil_stradegy(g, fil='node', node_fil='sub', nodefeat=nodefeat_)
-    g = fil.build_fv()
+    assert nx.is_connected(g)
+    assert agg in ['min', 'max', 'ave']
+    if agg == 'min':
+        op = lambda x: min(x)
+    elif agg == 'max':
+        op = lambda x: max(x)
+    elif agg == 'ave':
+        op = lambda x: np.average(x)
+    else:
+        raise Exception('Such aggreation %s is not supported'%agg)
 
-    x = graph2dgm(g)
-    diagram = x.get_diagram(g, key='fv', subflag='True', one_homology_flag=one_hom, parallel_flag=False, zigzag=False)
-    return diagram
+    gp = edgefeat(g, fil=fil, norm=norm)
+    # print('gp', gp)
+    # print('nodes',g.nodes())
+    nodefeat = []
+    for v in g.nodes():
+        v_nbr = list(nx.neighbors(g,v))
+        v_list = [gp[v][nbr] for nbr in v_nbr]
+        nodefeat.append(op(v_list))
+    nodefeat = np.array(nodefeat).reshape(len(g),1)
+    return nodefeat
 
+######
 def node_fil_(g = None, fil = 'deg', fil_d = 'sub', norm = False, one_hom = False, **kwargs):
     """
     sublevel filtration
@@ -457,18 +425,12 @@ def node_fil_(g = None, fil = 'deg', fil_d = 'sub', norm = False, one_hom = Fals
     :param kwargs: i: index of global gs
     :return: Persistence diagram.
     """
-
     # if g is None:
     #     assert 'gs' in globals().keys()
     #     i = kwargs['i']
     #     g = gs[i]
-    # print('in node_fil_', kwargs)
-
     g = nx.convert_node_labels_to_integers(g)
     nodefeat_ = nodefeat(g, fil, norm=norm, **kwargs)
-    assert kwargs.get('ntda', None) in [True, False, None]
-    if kwargs.get('ntda', None) == True: return array2dgm(nodefeat_, fil_d = fil_d)
-
     fil = fil_stradegy(g, fil='node', node_fil=fil_d, nodefeat=nodefeat_)
     g = fil.build_fv()
 
@@ -489,7 +451,7 @@ def edge_fil_(g = None, fil='jaccard', fil_d = 'sub', norm = False, one_hom = Fa
     """
     g = nx.convert_node_labels_to_integers(g)
     agg = 'min' if fil_d == 'sub' else 'max'
-    nodefeat_ = edgefeat(g, fil=fil, agg=agg, norm=norm)
+    nodefeat_ = efeat2nfeat(g, fil=fil, agg=agg, norm=norm)
     fil = fil_stradegy(g, fil='node', node_fil=fil_d, nodefeat=nodefeat_) # treat this as node fil
     g = fil.build_fv()
 
@@ -498,13 +460,13 @@ def edge_fil_(g = None, fil='jaccard', fil_d = 'sub', norm = False, one_hom = Fa
     diagram = x.get_diagram(g, key='fv', subflag=subflag, one_homology_flag=one_hom, parallel_flag=False, zigzag=False)
     return diagram
 
-
+######
 def g2dgm(i, g=None, fil='deg', fil_d = 'sub', norm=False, one_hom=False, debug_flag = False, **kwargs):
     """
     a wrapper of node_fil_ for parallel computing dgms.
     :param g:
     :param fil:
-    :param fil_d:
+    :param fil_d: sub/super
     :param norm: False by default
     :param one_hom: False by default
     :param debug_flag: False by default
@@ -513,73 +475,37 @@ def g2dgm(i, g=None, fil='deg', fil_d = 'sub', norm=False, one_hom=False, debug_
     """
     # assert 'gs' in globals().keys()
     # g = gs[i].copy()
-
     if debug_flag:
-        print('in g2dm', kwargs)
         print('processing %s-th graph where fil is %s and fil_d is %s' % (i, fil, fil_d))
+
     components = component_graphs(g)
     dgm = d.Diagram([])
     for component in components:
-        if fil in ['jaccard']:
+        if fil in ['jaccard', 'ricci', 'edge_p']:
             tmp_dgm = edge_fil_(component, fil=fil, fil_d=fil_d, norm=norm, one_hom=one_hom, **kwargs)
             print_dgm(tmp_dgm)
         else:
             tmp_dgm = node_fil_(component, fil=fil, fil_d=fil_d, norm=norm, one_hom=one_hom, **kwargs)
-
         dgm = add_dgm(dgm, tmp_dgm)
         dgm = dgm_filter(dgm)
     dgm = dgm_filter(dgm) # handle the case when comonents is empty
     return dgm
 
-
 def gs2dgms_parallel(n_jobs = 1, **kwargs):
-    """ a wraaper of g2dgm for parallel computation
-        sync with the same-named function in fil.py
-        put here for parallelizaiton reason
-    """
-
-    if dgms_dir_test(**kwargs)[1]: #and kwargs.get('ntda', None)!=True: # load only when ntda=False
-        dgms = load_dgms(**kwargs)
-        return dgms
+    global gs
     try:
         assert 'gs' in globals().keys()
     except AssertionError:
         print(globals().keys())
 
-    try:
-        # print('in gs2dgms_parallel', kwargs)
-        dgms = Parallel(n_jobs=n_jobs)(delayed(g2dgm)(i, gs[i], **kwargs) for i in range(len(gs)))
-    except NameError:  # name gs is not defined
-        sys.exit('NameError and exit')
-
-    save_dgms(dgms, **kwargs)
+    dgms = Parallel(n_jobs=n_jobs)(delayed(g2dgm)(i, g=gs[i], **kwargs) for i in range(len(gs)))
     return dgms
-
-def _gs2dgms_parallel(n_jobs = 1, **kwargs):
-    """ a wraaper of g2dgm for parallel computation """
-    if dgms_dir_test(**kwargs)[1]:
-        dgms = load_dgms(**kwargs)
-        return dgms
-    try:
-        assert 'gs' in globals().keys()
-    except AssertionError:
-        print(globals().keys())
-
-    try:
-        dgms = Parallel(n_jobs=n_jobs)(delayed(g2dgm)(i, gs[i], **kwargs) for i in range(len(gs)))
-    except NameError:  # name gs is not defined
-        print('NameError and exit')
-        sys.exit()
-
-    save_dgms(dgms, **kwargs)
-    return dgms
-
 
 @timefunction
 def gs2dgms(gs, fil='deg', fil_d = 'sub', norm=False, one_hom=False, debug_flag = False, **kwargs):
     """
     serial computing dgms
-    :param gs: a list of raw nx graphs(no function value)
+    :param gs: a list of nx graphs
     :param fil: filtration(deg, ricci)
     :param fil_d : sub or sup
     :param norm: whether normalize or not
@@ -599,106 +525,17 @@ def gs2dgms(gs, fil='deg', fil_d = 'sub', norm=False, one_hom=False, debug_flag 
             tmp_dgm = node_fil_(component, fil=fil, fil_d = fil_d, norm=norm, one_hom=one_hom, **kwargs)
             dgm = add_dgm(dgm, tmp_dgm)
             dgm = dgm_filter(dgm)
-            # TODO: implement edge_fil_
         assert len(dgm) > 0
         dgms.append(dgm)
 
     return dgms
 
-def dgm_filter(dgm):
-    """ if input is an empyt dgm, add origin point """
-    if len(dgm) > 0:
-        return dgm
-    else:
-        return d.Diagram([[0,0]])
-
 if __name__ == '__main__':
-    # g = nx.random_geometric_graph(100, 0.3)
-    # nodefeat = edgefeat(g, fil='ricci', agg='min', norm=False)
-    # print(nodefeat.shape)
-
-    # compute for graphs that are larger than memory
-    if False:
-        from Esme.graph.dataset.modelnet import modelnet2graphs
-        version = '10'
-        gs, labels = modelnet2graphs(version=version, print_flag=True, a = 0, b = 100)
-        norm = False # todo: change to True
-        for fil in ['hks_1', 'hks_10', 'hks_0.1']:
-            n_jobs = 1
-            for ntda in [False]:
-                subdgms = gs2dgms(gs=gs, n_jobs=n_jobs, fil=fil, fil_d='sub', norm=norm, graph = 'mn' + version, ntda = ntda, debug_flag = True)
-                for i in range(a,b):
-                    from Esme.dgms.format import export_dgm
-                    dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/mn10/', fil, 'sub/norm_False' )
-                    print(dir)
-                    export_dgm(subdgms[i-a], dir=dir, filename=i+'.csv')
-        sys.exit()
-    # computing dgms for replicate.py
-    graph = 'cox2'
-    for graph in  ['bzr', 'cox2', 'dhfr', 'dd_test', 'nci1',  'frankenstein', 'protein_data',   'imdb_binary',  'imdb_multi', 'reddit_binary', 'reddit_5K']:
-        from Esme.graph.dataset.tu_dataset import load_tugraphs, load_shapegraphs
-        from Esme.graph.dataset.modelnet import modelnet2graphs
-        gs, labels = load_tugraphs(graph)
-        # gs, labels = modelnet2graphs(version='10', print_flag=True, test_size=None) # load_shapegraphs(graph)
-        norm = True # todo: change to True
-        for fil in ['hks_1', 'hks_10', 'hks_0.1']: # ['deg', 'random', 'cc', 'fiedler', 'ricci']:
-            n_jobs = 1
-            for ntda in [False]:
-                # subdgms = gs2dgms(gs=gs, n_jobs=n_jobs, fil=fil, fil_d='sub', norm=norm, graph = graph, ntda = ntda, debug_flag = True)
-                # supdgms = gs2dgms(gs=gs, n_jobs=n_jobs, fil=fil, fil_d='sup', norm=norm, graph = graph, ntda = ntda, debug_flag = True)
-                # epddgms = gs2dgms(gs=gs, n_jobs=n_jobs, fil=fil, one_hom=True, norm=norm, graph = graph, ntda = ntda, debug_flag = True)
-
-                subdgms = gs2dgms_parallel(n_jobs=n_jobs, fil=fil, fil_d='sub', norm=norm, graph = graph, ntda = ntda, debug_flag = True)
-                supdgms = gs2dgms_parallel(n_jobs=n_jobs, fil=fil, fil_d='sup', norm=norm, graph = graph, ntda = ntda, debug_flag = True)
-                epddgms = gs2dgms_parallel(n_jobs=n_jobs, fil=fil, one_hom=True, norm=norm, graph = graph, ntda = ntda, debug_flag = True)
-        continue
-        for fil in ['deg', 'random', 'ricci', 'cc', 'fiedler']:
-            for ntda in [True]:
-                subdgms = gs2dgms_parallel(n_jobs=-1, fil=fil, fil_d='sub', norm=norm, graph=graph, ntda=ntda)
-                supdgms = gs2dgms_parallel(n_jobs=-1, fil=fil, fil_d='sup', norm=norm, graph=graph, ntda=ntda)
-                epddgms = gs2dgms_parallel(n_jobs=-1, fil=fil, one_hom=True, norm=norm, graph=graph, ntda=ntda)
-
-    sys.exit()
-
-    save_dgms(subdgms, **kwargs)
-    dgms_summary(subdgms)
-    debug(subdgms, 'subdgms')
-
-
-    g = nx.random_geometric_graph(100, 0.4)
-    print(edgefeat(g, fil='jaccard'))
-    np.random.seed(42)
-    n_node = 20
-    g = nx.random_geometric_graph(n_node, 0.5, seed=42)
-    diagram = node_fil(g, fil = 'hop', norm=True, base=0)
-    print(diagram)
-
-    # node feat example
-    nodefeat = np.array(list(dict(nx.degree(g)).values())).reshape(len(g),1) # np.random.random((n_node, 1))
-    nonfeat = nodefeat / float(max(nodefeat))
-    fil = fil_stradegy(g, fil='node', node_fil='sub', nodefeat = nodefeat)
-    g = fil.build_fv()
-    for u, v in g.edges():
-        assert g[u][v]['fv'] == max(g.node[u]['fv'], g.node[v]['fv'])
-    x = graph2dgm(g)
-    diagram = x.get_diagram(g, key='fv', subflag='True', one_homology_flag=False, parallel_flag=False, zigzag=False)
-
-    # edge feat example
-    fil = fil_stradegy(g, fil='edge')
-    fil.edgefeat(func='edge_prob', edge_fil='sup')
-    g = fil.build_fv()
-    for u in g.nodes():
-        nbrs = nx.neighbors(g, u)
-        nbredgevals = []
-        for v in nbrs:
-            nbredgevals.append(g[u][v]['fv'])
-        assert g.node[u]['fv'] == max(nbredgevals)
-    x = graph2dgm(g)
-    diagram = x.get_diagram(g, key='fv', subflag='True', one_homology_flag=False, parallel_flag=False, zigzag=False)
+    g = nx.random_geometric_graph(1000, 0.1, seed=42)
 
     # combined fil -- one way
-    fil = fil_stradegy(g, fil='combined', nodefeat=nodefeat)
-    fil.edgefeat(func='edge_prob', edge_fil='sup')
+    fil = fil_stradegy(g, fil='combined', nodefeat=np.random.random((len(g), 1)))
+    fil.edgefeat(func='edge_p', edge_fil='sup')
     g1 = fil.build_fv()
     x = graph2dgm(g1, nodefil='sub', edgefil='sup')
     diagram = x.get_diagram(g1, key='fv', subflag='True', one_homology_flag=False, parallel_flag=False, zigzag=True)
@@ -706,10 +543,42 @@ if __name__ == '__main__':
 
     # combined fil -- anathor way. Almost the same with the previous example.
     fil = fil_stradegy(g, fil='combined')
-    fil.edgefeat(func='edge_prob', edge_fil='sup')
-    fil.nodefeat(nodefeat=nodefeat)
+    fil.edgefeat(func='edge_p', edge_fil='sup')
+    fil.nodefeat(func='random')
     g2 = fil.build_fv()
     x = graph2dgm(g2, nodefil='sub', edgefil='sup')
     dgm = x.get_diagram(g2, key='fv', subflag='True', one_homology_flag=False, parallel_flag=False, zigzag=True)
     print_dgm(dgm)
+    sys.exit()
+
+    # edge feat example
+    fil = fil_stradegy(g, fil='edge')
+    fil.edgefeat(func='edge_p', edge_fil='sup')
+    g = fil.build_fv()
+    x = graph2dgm(g)
+    diagram = x.get_diagram(g, key='fv', subflag='True', one_homology_flag=False, parallel_flag=False, zigzag=False)
+    print(diagram)
+
+    # node feat example
+    nodefeat_ = np.array(list(dict(nx.degree(g)).values())).reshape(len(g), 1)  # np.random.random((n_node, 1))
+    nodefeat_ = nodefeat_ / float(max(nodefeat_))
+    fil = fil_stradegy(g, fil='node', node_fil='sub', nodefeat=nodefeat_)
+    g = fil.build_fv()
+    x = graph2dgm(g)
+    diagram = x.get_diagram(g, key='fv', subflag='True', one_homology_flag=False, parallel_flag=False, zigzag=False)
+    print(diagram)
+
+    # imdb
+    gs, labels = load_graphs(dataset='imdb_binary')  # step 1
+    subdgms = gs2dgms_parallel(n_jobs=1, fil='jaccard', fil_d='sub', one_hom=False, debug_flag=False)  # step2 # TODO: need to add interface
+    dgms_summary(subdgms)
+    debug(subdgms, 'subdgms')
+
+    g = nx.random_geometric_graph(100, 0.4)
+    print(edgefeat(g, fil='jaccard'))
+    np.random.seed(42)
+    n_node = 20
+    g = nx.random_geometric_graph(n_node, 0.5, seed=42)
+    diagram = node_fil_(g, fil = 'hop', norm=True, base=0)
+    print(diagram)
 

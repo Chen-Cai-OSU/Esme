@@ -1,14 +1,16 @@
+""" sbm graph classification """
+
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+
 import matplotlib.pyplot as plt
 import numpy as np
 
 from Esme.dgms.compute import alldgms
-from Esme.dgms.kernel import sw_parallel
-
 from Esme.dgms.format import dgms2swdgms
-from Esme.graph.function import fil_strategy
-from Esme.graph.generativeModel import sbms
-from Esme.applications.motif.NRL.src.classification import ArgumentParser, ArgumentDefaultsHelpFormatter
+from Esme.dgms.kernel import sw_parallel
 from Esme.embedding.lap import LaplacianEigenmaps
+from Esme.graph.function import fil_strategy
+from Esme.graph.generativemodel import sbms
 from Esme.ml.svm import classifier
 
 parser = ArgumentParser("scoring", formatter_class=ArgumentDefaultsHelpFormatter, conflict_handler='resolve')
@@ -37,13 +39,15 @@ if __name__ == '__main__':
         g = gs[i]
         lp = LaplacianEigenmaps(d=1)
         lp.learn_embedding(g, weight='weight')
-        lapfeat = lp.get_embedding()
+        lapfeat = lp.get_embedding() # lapfeat is an array
+
         # viz = True if i%100==0 else False
         # plt.subplot(2, 1, 1+i//100)
         # plt.plot(lapfeat)
         # plt.show()
-        # sys.exit()
+
         gs[i] = fil_strategy(g, lapfeat, method=fil_method, viz_flag=False, **edge_kwargs)
+
     # plt.show()
     # sys.exit()
     # plot node fv value
@@ -55,12 +59,12 @@ if __name__ == '__main__':
     # sys.exit()
 
     print('Finish computing lapfeat')
-    dgms = alldgms(gs, radius=float('inf'), dataset='', recompute_flag=True, method='serial', n=2 * n,
-                   zigzag=zigzag)  # compute dgms in parallel
+    dgms = alldgms(gs, radius=float('inf'), dataset='', recompute_flag=True, method='serial', n=2 * n, zigzag=zigzag)  # compute dgms in parallel
     print('Finish computing dgms')
     swdgms = dgms2swdgms(dgms)
-    kwargs = {'bw': 1, 'K': 1, 'p': 1}  # TODO: K and p is dummy here
-    sw_kernel, _ = sw_parallel(swdgms, swdgms, kernel_type='sw', parallel_flag=True, **kwargs)
+
+    feat_kwargs = {'n_directions': 10, 'bw': 1}
+    sw_kernel, _ = sw_parallel(swdgms, swdgms, kernel_type='sw', parallel_flag=True, **feat_kwargs)
     clf = classifier(np.zeros((len(labels), 10)), labels, method=None, kernel=sw_kernel)
     print(clf.svm_kernel_())
     print(p, q, edge_kwargs)

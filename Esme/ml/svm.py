@@ -27,6 +27,8 @@ class classifier():
         self.n_cv = n_cv
         self.method = method
         if 'kernel' in kwargs.keys(): self.kernel = kwargs['kernel']
+
+        self.print_flag = kwargs.get('print_flag', 'off')
         self.stat = {'train': None, 'test': None}
         # self.direct = kwargs[''] # TODO more generic here
 
@@ -40,14 +42,14 @@ class classifier():
     def svm(self, n_splits = 10):
         # linear/Gaussian kernel
 
-        self.stat['train'] = train_svm(self.x, self.y)
+        self.stat['train'] = train_svm(self.x, self.y, print_flag=self.print_flag) # hyper-parameter seach
         eval_mean, eval_std, n_cv = evaluate_best_estimator(self.stat['train'], self.x, self.y, print_flag='off', n_splits = n_splits, n_cv=self.n_cv)
         self.stat['test'] = {'mean': eval_mean, 'std': eval_std, 'n_cv': n_cv}
 
     def svm_kernel_(self, n_splits = 10):
         # precomputed kernel
 
-        self.stat['train'] = train_svm(self.x, self.y, kernel_flag=True, kernel=self.kernel, print_flag='off')
+        self.stat['train'] = train_svm(self.x, self.y, kernel_flag=True, kernel=self.kernel, print_flag=self.print_flag)
         eval_mean, eval_std, n_cv = evaluate_best_estimator(self.stat['train'], self.x, self.y, print_flag='off', kernel=self.kernel, n_splits=n_splits, n_cv = self.n_cv)
         self.stat['test'] = {'mean': eval_mean, 'std': eval_std, 'n_cv': n_cv}
 
@@ -90,6 +92,8 @@ def train_svm(x, y, random_state=2, print_flag='off', nonlinear_flag = True, ker
     :param kernel: precomputed kernel. No need to pass if use gaussian/linear kernel
     :return: best parameters
     """
+    print('print_flag is', print_flag)
+    assert print_flag in ['on', 'off']
     tuned_params = [{'kernel': ['linear'], 'C': [0.01, 1, 10, 100, 1000]}]
     if nonlinear_flag:
         tuned_params += [{'kernel': ['rbf'], 'gamma': [0.01, 0.1, 1, 10, 100], 'C': [0.1, 1, 10, 100,1000]}]
@@ -205,8 +209,8 @@ def evaluate_best_estimator(grid_search_re, x, y, print_flag='off', kernel=None,
     if print_flag=='on':
         print(cv_score)
 
-    print('Evaluation takes %0.3f. '
-          'After averageing %0.1f cross validations, the mean accuracy is %0.3f, the std is %0.3f\n'
+    print('Evaluation takes %0.3f. \n'
+          'After averageing %0.1f cross validations, the mean accuracy is %0.3f, the std is %0.5f'
           %(time.time()-t0, n_cv, cv_score.mean(), cv_score.std()))
     return cv_score.mean(), cv_score.std(), n_cv
 

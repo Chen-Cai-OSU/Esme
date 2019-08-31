@@ -8,7 +8,6 @@ from sklearn.neighbors import radius_neighbors_graph
 
 from Esme.viz.graph import viz_graph
 
-
 def random_insertion(G, n=3, print_flag = False):
     G = G.copy()
     nodes = list(G.nodes)

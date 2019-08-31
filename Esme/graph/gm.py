@@ -1,10 +1,12 @@
+""" similar to 2sbm_nc """
+
 import sys
 import numpy as np
 import networkx as nx
 from networkx.generators.community import stochastic_block_model
 
 # from importlib import reload  # Python 3.4+ only.
-from Esme.applications.motif.NRL.src.classification import ArgumentParser, ArgumentDefaultsHelpFormatter
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from Esme.embedding.lap import LaplacianEigenmaps
 
 from Esme.ml.svm import classifier
@@ -46,11 +48,10 @@ if __name__ == '__main__':
 
     for n in g.nodes():
         g.node[n]['lap'] = float(lapfeat[n,0])
-    # g = function_basis(g, [fil], norm_flag='yes') # need to add another module to handle laplacian
     g = add_edgeval(g, fil=fil)
 
     ego = egograph(g, radius=radius, n = len(g), recompute_flag=True, norm_flag=True, print_flag=False)
-    egographs = ego.egographs(method='parallel')
+    egographs = ego.egographs(method='serial')
     dgms = alldgms(egographs, radius=radius, dataset='', recompute_flag=True, method='serial', n=n_node)  # compute dgms in parallel
 
 
@@ -58,7 +59,7 @@ if __name__ == '__main__':
     dgms_summary(dgms)
 
     swdgms = dgms2swdgms(dgms)
-    kwargs = {'bw': 1, 'K': 1, 'p': 1}  # TODO: K and p is dummy here
+    kwargs = {'bw': 1, 'n_directions': 10}
     sw_kernel, _ = sw_parallel(swdgms, swdgms, kernel_type='sw', parallel_flag=True, **kwargs)
     # sw_distm = np.log()
 
@@ -78,8 +79,6 @@ if __name__ == '__main__':
     viz_distm(gnnfeat_distm, y=labels, mode='mds')
     clf = classifier(gnnfeat, labels, method=None)
     clf.svm()
-
-
 
     lp = LaplacianEigenmaps(d=1)
     lp.learn_embedding(g, weight='weight')
@@ -105,13 +104,4 @@ if __name__ == '__main__':
 
     sys.exit()
 
-    eucdist = euc_dist(emb)
-    # viz_matrix(eucdist)
-    # viz_distm(eucdist, mode='tsne', y=labels)
-
-    sys.exit()
-
-    distm = bd_distance(dgms)
-    sw_dist = -np.log(sw_kernel)
-    viz_distm(sw_dist, y = labels, mode = 'tsne')
 

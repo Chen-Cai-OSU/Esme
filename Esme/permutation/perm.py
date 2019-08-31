@@ -18,7 +18,7 @@ from Esme.permutation.aux.helper import get_subgraphs, attribute_mean, get_diagr
 from Esme.permutation.aux.persistence import set_hyperparameter, add_function_value
 from Esme.permutation.aux.tools import load_data, dump_data, diag2dgm, unzip_databundle, fv, flip_dgm, add_dgms, \
     print_dgm, dgm2diag
-from Esme.helper.io import make_dir
+from Esme.helper.io_related import make_dir
 from Esme.permutation.aux.util import graphassertion
 
 

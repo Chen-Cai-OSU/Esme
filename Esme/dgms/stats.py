@@ -1,7 +1,12 @@
 """ functons related to statistics of persistence diagrams. """
-
+import dionysus as d
 import numpy as np
 from Esme.helper.format import precision_format as pf
+import networkx as nx
+
+def normalize_(X, axis=0):
+    from sklearn.preprocessing import normalize
+    return normalize(X, axis=axis)
 
 def dgms_summary(dgms, debug='off'):
     n = len(dgms)
@@ -33,3 +38,44 @@ def viz_dgm():
 def print_dgm(dgm):
     for p in dgm:
         print(p)
+
+def dgm_filter(dgm):
+    """ if input is an empyt dgm, add origin point """
+    if len(dgm) > 0:
+        return dgm
+    else:
+        return d.Diagram([[0,0]])
+
+def stat(lis, high_order=False):
+    # lis = [a for a in lis if a!=0.00123]
+    # list = angledgm
+    if high_order == True:
+        pass
+    return np.array([np.min(lis), np.max(lis), np.median(lis), np.mean(lis), np.std(lis)])
+
+def bl0(dgms_to_save_, key='deg'):
+    # todo refactor
+    graphs = dgms_to_save_['graphs']
+    n = len(graphs)
+    blfeat = np.zeros((n, 5))
+    for i in range(n):
+        fval = nx.get_node_attributes(graphs[i][0], key).values()
+        blfeat[i] = stat(fval)
+    return blfeat
+
+def bl1(dgms):
+    """ for each dgm in dgms, compute a 5 dim feature vector (min, max, mean, median, std) """
+    n = len(dgms)
+    blfeat = np.zeros((n, 5))
+
+    for i in range(n):
+        dgm = dgms[i]  # a list of lists
+        cval = []
+        for p in dgm:
+            cval += p
+        assert len(cval) == 2 * len(dgm)
+        blfeat[i] = stat(cval)
+
+    blfeat = normalize_(blfeat, axis=0)
+    return blfeat
+

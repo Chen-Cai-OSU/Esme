@@ -7,9 +7,9 @@ import numpy as np
 from joblib import Parallel, delayed
 
 from Esme.applications.motif.aux import add_edge_val
-from Esme.graph.generativeModel import sbm
+from Esme.graph.generativemodel import sbm
 from Esme.helper.format import precision_format
-from Esme.helper.io import io
+from Esme.helper.io_related import io
 from Esme.helper.time import timefunction
 
 class square_class:

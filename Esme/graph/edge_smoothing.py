@@ -11,7 +11,7 @@ from Esme.dgms.stats import dgms_summary
 from Esme.dgms.stats import print_dgm
 from Esme.embedding.lap import LaplacianEigenmaps
 from Esme.graph.egograph import egograph
-from Esme.graph.generativeModel import sbm
+from Esme.graph.generativemodel import sbm
 from Esme.ml.svm import classifier
 from Esme.viz.matrix import viz_matrix
 

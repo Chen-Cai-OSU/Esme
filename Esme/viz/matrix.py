@@ -73,7 +73,7 @@ def viz_distm(m, rs = 42, mode='mds', y=None):
     else:
         raise Exception('No such visualization mode')
 
-    plt.scatter(pos[:, 0], pos[:, 1], c = y)
+    plt.scatter(pos[:, 0], pos[:, 1], c = y, s=0.1)
     plt.title('%s viz of matrix of size (%s %s)'%(mode, m.shape[0], m.shape[1]))
     plt.show()
 
@@ -115,19 +115,15 @@ def color_map(i):
 def mds(m, y, rs=42):
     # TODO test
     """
-    :param m: distance matrix 
-    :param y: label
+    :param m: distance matrix (np.array of shape (n, n))
+    :param y: label y = np.array([1] * 5 + [-1] * 5)
     :param rs: random seed
     :return: 
     """
     # input is the distance matrix
     # ouput: draw the mds/tsne 2D embedding
     
-    m = np.random.random((10,10))
-    y = np.array([1] * 5 + [-1] * 5)
     assert m.shape == (len(y), len(y))
-    
-    
     mds = manifold.MDS(dissimilarity='precomputed', n_jobs=-1, random_state=rs, verbose=0)
     tsne = manifold.TSNE(metric='precomputed', verbose=0, random_state=rs)
     mds_pos = mds.fit_transform(m)

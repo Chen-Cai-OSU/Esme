@@ -63,7 +63,7 @@ def viz_vector():
 if __name__ == '__main__':
 
     # fake fake test
-    graph = 'reddit_binary'
+    graph = 'imdb_binary' # 'reddit_binary'
     norm = True
     fil = 'ricci'
     gs, labels = load_tugraphs(graph)
@@ -79,14 +79,15 @@ if __name__ == '__main__':
     print_dgm(fake_dgms[0])
     print('-' * 20)
     print_dgm(another_fake_dgms[0])
-    sys.exit()
-
 
     all_dgms = true_dgms + fake_dgms
     all_dgms = dgms2swdgms(all_dgms)
 
     feat_kwargs = {'n_directions': 10, 'bw':1}
     k, _ = sw_parallel(all_dgms, all_dgms, parallel_flag=True, kernel_type='sw', **feat_kwargs)
+    from Esme.viz.matrix import viz_distm
+    fake_labels = [-label for label in labels]
+    viz_distm(k, mode='tsne', y= labels + fake_labels)
 
     print(k.shape)
 

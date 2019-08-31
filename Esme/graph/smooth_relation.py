@@ -7,7 +7,7 @@ from scipy.spatial.distance import cdist
 from Esme.dgms.compute import alldgms
 from Esme.embedding.lap import LaplacianEigenmaps
 from Esme.graph.egograph import egograph
-from Esme.graph.generativeModel import sbm
+from Esme.graph.generativemodel import sbm
 from Esme.viz.matrix import viz_matrix
 
 if __name__ == '__main__':

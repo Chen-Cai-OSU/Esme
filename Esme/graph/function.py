@@ -1,8 +1,11 @@
+""" define the filtration on graphs"""
+
 import networkx as nx
 import numpy as np
 np.random.seed(42)
 import Esme.graphonlib as graphonlib
 from Esme.viz.matrix import viz_matrix
+from Esme.helper.time import timefunction
 
 def function_basis(g, allowed, norm_flag = 'no'):
     # input: g
@@ -95,14 +98,25 @@ def attribute_mean(g, i, key='deg', cutoff=1, iteration=0):
             g.node[i][key_std] = np.std(nbrs_deg)
             g.node[i][key_sum] = np.sum(nbrs_deg)
 
+@timefunction
 def fil_strategy(g, nodefeat, method='node', viz_flag = False, **kwargs):
-    """ given a graph, implement node/edge and combined filtration
-        kwargs are used for edge filtration
     """
+    given a graph, implement node/edge and combined filtration
+    kwargs are used for edge filtration
+
+    :param g: a networkx graph
+    :param nodefeat: array of shape (n_node, 1)
+    :param method: edge/node/combined
+    :param viz_flag:
+    :param kwargs: for edge filtration
+    :return: a networkx graph
+    """
+
     # g = nx.random_geometric_graph(100, 0.3)
     g = nx.convert_node_labels_to_integers(g)
     a = nx.adjacency_matrix(g).todense()
 
+    # compute the filtration function value on each edge.
     if method=='edge':
         if kwargs['edgefunc'] == 'edge_prob':
             try:
@@ -125,6 +139,7 @@ def fil_strategy(g, nodefeat, method='node', viz_flag = False, **kwargs):
         else:
             raise Exception('No such edgefunc %s implemented '%kwargs['edgefunc'])
 
+        # fill in node value. The default filtration for edge is superlevel filtration. (let reliable edge comes in first)
         attributes = nx.get_edge_attributes(g, 'fv')
         for n in g.nodes():
             nbrs = nx.neighbors(g, n)
@@ -136,18 +151,18 @@ def fil_strategy(g, nodefeat, method='node', viz_flag = False, **kwargs):
     elif method=='node':
         for n in g.nodes():
             g.node[n]['fv'] = nodefeat[n, 0].astype(float)
-        for u, v in g.edges():
+        for u, v in g.edges(): # sublevel filtration
             g[u][v]['fv'] = max(g.node[u]['fv'], g.node[v]['fv'])
 
     elif method == 'combined':
         # need to turn on zigzag flag
         try:
-            h = 0.3 if 'h' not in kwargs.keys() else kwargs['h']
-            p_zhang = graphonlib.smoothing.zhang.smoother(a, h=h)  # h : neighborhood size parameter. Example: 0.3 means to include
+            p_zhang = graphonlib.smoothing.zhang.smoother(a, h=kwargs['h'])  # h : neighborhood size parameter. Example: 0.3 means to include
         except ValueError:  # for nci1, some adj matrix is rather small
             print('Exception: set p_zhang as 0')
             p_zhang = np.zeros((len(g), len(g)))
 
+        # edge probability for edge value. Nodefeat for node value.
         for u, v in g.edges():
             g[u][v]['fv'] = p_zhang[u][v]
         for n in g.nodes():
@@ -157,3 +172,10 @@ def fil_strategy(g, nodefeat, method='node', viz_flag = False, **kwargs):
         raise Exception('No such filtration strategy')
 
     return g
+
+if __name__ == '__main__':
+    g = nx.random_geometric_graph(1000, 0.1)  # create a random graph
+    nodefeat = np.random.random((1000,1))
+    edge_kwargs = {}
+    g = fil_strategy(g, nodefeat, method='node', viz_flag=False, **edge_kwargs)
+

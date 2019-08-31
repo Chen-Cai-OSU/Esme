@@ -26,6 +26,14 @@ def sw(dgms1, dgms2, kernel_type='sw', parallel_flag=False, **featkwargs):
     """
     def arctan(C, p):
         return lambda x: C * np.arctan(np.power(x[1], p))
+    import signal
+
+    def signal_handler(signum, frame):
+        raise Exception("Timed out!")
+
+    signal.signal(signal.SIGALRM, signal_handler)
+    time_limit = max(int(len(dgms1)*len(dgms2)* 0.1),100)
+    signal.alarm(time_limit)
 
     if parallel_flag==False:
         if kernel_type=='sw':
@@ -46,8 +54,9 @@ def sw(dgms1, dgms2, kernel_type='sw', parallel_flag=False, **featkwargs):
         diags1 = dgms1; diags2 = dgms2
         X = tda_kernel.fit(diags1)
         Y = tda_kernel.transform(diags2)
-        # Y = np.nan_to_num(Y) # todo wait for mathieu's reply
+        Y = np.nan_to_num(Y) # todo wait for mathieu's reply
         return Y
+
 
 @timefunction
 def sw_parallel(dgms1, dgms2, kernel_type='sw', parallel_flag=True, granularity=25, **featkwargs):
@@ -113,10 +122,11 @@ def random_dgms(n=10):
 
 if __name__ == '__main__':
     dgms1 = generate_swdgm(100)
-
     # dummy_kwargs = {'n_directions':10, 'bw':1}
     dummy_kwargs = {'bwf':1, 'bw':1}
+    print('serial kernel\n' + '-'*50)
     serial_kernel = sw_parallel(dgms1, dgms1, kernel_type='pf', parallel_flag=False, **dummy_kwargs)[0]
+    print('parallel kernel\n' + '-'*50)
     parallel_kernel = sw_parallel(dgms1, dgms1, kernel_type='pf', parallel_flag=True, **dummy_kwargs)[0]
     print(serial_kernel, parallel_kernel)
     diff = serial_kernel - parallel_kernel

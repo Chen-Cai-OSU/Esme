@@ -11,11 +11,13 @@ from joblib import Parallel, delayed
 import sklearn_tda as tda
 import time
 
-from Esme.helper.stat import statfeat
+from Esme.helper.stats import statfeat
 from Esme.dgms.format import dgms2diags, dgm2diag
 from Esme.helper.format import precision_format, rm_zerocol, normalize_
 from Esme.helper.others import filterdict
 from Esme.dgms.format import flip_dgms, assert_dgms_above
+from Esme.dgms.fake import coordinate
+
 
 def unwrap_pdvector(*arg, **kwarg):
     # http://qingkaikong.blogspot.com/2016/12/python-parallel-method-in-class.html
@@ -75,6 +77,15 @@ class pipl():
             LS = tda.Landscape(**kwargs)
             # LS = tda.Landscape(num_landscapes=5, resolution=100)
             res = LS.fit_transform(self.diags)
+
+        elif self.vec_type == 'pervec': # permutation vector, i.e. the historgram of coordinates of dgm
+            dgms = self.dgms
+            kwargs = filterdict(kwargs, ['dim'])
+            res = coordinate(dgms[0], **kwargs)
+            for i in range(1, len(dgms)):
+                tmp = coordinate(dgms[i], **kwargs)
+                res = np.concatenate((res, tmp), axis=0)
+            assert res.shape[0] == len(dgms)
 
         else:
             raise Exception('Unknown vec_type. You can only chose pi or pl')
@@ -194,10 +205,13 @@ def dgms2vec(dgms, vectype='pi', graphs = None, verbose = 0, **params):
     except AssertionError:
         print(min(list(map(len, dgms))))
     if vectype == 'pi':
-        pi = pipl(dgms, type='pi')
+        pi = pipl(dgms, type=vectype)
         vecs = pi.dgms_vecs(**params)
     elif vectype == 'pl':
-        pl = pipl(dgms, type='pl')
+        pl = pipl(dgms, type=vectype)
+        vecs = pl.dgms_vecs(**params)
+    elif vectype == 'pervec':
+        pl = pipl(dgms, type=vectype)
         vecs = pl.dgms_vecs(**params)
     elif vectype == 'pvector':
         pdv = pdvector()
@@ -205,7 +219,8 @@ def dgms2vec(dgms, vectype='pi', graphs = None, verbose = 0, **params):
 
     elif vectype =='bl1':
         diags = dgms2diags(dgms)
-        vecs = bl1(diags) # TODO
+        from Esme.dgms.stats import bl1
+        vecs = bl1(diags)
 
     elif vectype == 'bl0':
         assert graphs is not None
@@ -215,7 +230,7 @@ def dgms2vec(dgms, vectype='pi', graphs = None, verbose = 0, **params):
             fval = nx.get_node_attributes(graphs[i][0], params['filtration']).values()
             vecs[i] = stat(fval) # TODO
     else:
-        raise Exception('vec type error')
+        raise Exception('vec type error. No vectype: %s'%vectype)
 
     if verbose:
         print(np.shape(vecs))
@@ -268,7 +283,7 @@ def dgm_statfeat(dgm):
     return feat
 
 if __name__ == '__main__':
-    dgm = d.Diagram([(2,3), (3,4)])
+    dgm = d.Diagram([(.2,.3), (.3,.4)])
     dgms = [dgm] * 10
     labels = np.array([1, -1]*50)
 
@@ -285,6 +300,12 @@ if __name__ == '__main__':
     pd_vector = dgms2vec(dgms, vectype ='pvector')
     pd_vectors = merge_dgms(dgms, dgms, dgms, vectype = 'pvector')
     print (np.shape(pd_vector), np.shape(pd_vectors))
+
+    params = {'dim': 99}
+    pd_vector = dgms2vec(dgms, vectype='pervec', **params)
+    pd_vectors = merge_dgms(dgms, dgms, dgms, vectype='pervec')
+    print(np.shape(pd_vector), np.shape(pd_vectors),pd_vectors)
+
     sys.exit()
 
 

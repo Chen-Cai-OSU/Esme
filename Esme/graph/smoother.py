@@ -1,4 +1,5 @@
 # calculate the smoothness of signal on graph
+
 from Esme.viz.graph import *
 import networkx as nx
 import numpy as np
