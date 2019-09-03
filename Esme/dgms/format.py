@@ -8,6 +8,8 @@ import time
 import dionysus as d
 import numpy as np
 from sklearn.preprocessing import normalize
+from Esme.helper.time import precision_format
+
 
 def tuple2dgm(tup):
     return d.Diagram(tup)
@@ -143,14 +145,18 @@ def normalize_dgms(dgms):
         res.append(normalize_dgm(dgm))
     return res
 
-def export_dgm(dgm, dir='./', filename='dgm.csv'):
+def export_dgm(dgm, dir='./', filename='dgm.csv', print_flag = False):
     # dgm = diagram
+    t0 = time.time()
     diag = dgm2diag(dgm)
     if not os.path.exists(dir):
         os.makedirs(dir)
     with open(dir + filename, "w") as f:
         writer = csv.writer(f)
         writer.writerows(diag)
+
+    if print_flag:
+        print(f'export dgm({len(dgm)}) to {dir + filename}. Takes {precision_format(time.time()-t0, 2)}')
 
 def load_dgm(dir='./', filename='dgm.csv'):
     # dir = '/home/cai.507/Documents/DeepLearning/Esmé/dgms/deg/sub/norm_False'

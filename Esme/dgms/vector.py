@@ -17,6 +17,7 @@ from Esme.helper.format import precision_format, rm_zerocol, normalize_
 from Esme.helper.others import filterdict
 from Esme.dgms.format import flip_dgms, assert_dgms_above
 from Esme.dgms.fake import coordinate
+from sklearn_tda import *
 
 
 def unwrap_pdvector(*arg, **kwarg):
@@ -63,20 +64,47 @@ class pipl():
             return lambda x: C * np.arctan(np.power(x[1], p))
 
         if self.vec_type == 'pi':
-            diagsT = tda.DiagramPreprocessor(use=True, scaler=tda.BirthPersistenceTransform()).fit_transform(self.diags)
+            if True:
+                diagsT = DiagramPreprocessor(use=True, scalers=[([0, 1], BirthPersistenceTransform())]).fit_transform(
+                    self.diags)
+                PI = PersistenceImage(bandwidth=1., weight=lambda x: x[1], im_range=[0, 10, 0, 10],
+                                      resolution=[100, 100])
+                res = PI.fit_transform(diagsT)
 
-            kwargs = filterdict(kwargs, ['bandwidth', 'weight', 'im_range', 'resolution'])
-            kwargs['weight'] = arctan(kwargs['weight'][0], kwargs['weight'][1])
+            if False:
+                diagsT = tda.DiagramPreprocessor(use=True, scalers=[([0, 1], tda.BirthPersistenceTransform())]).fit_transform(self.diags)
+                PI = tda.PersistenceImage(bandwidth=1., weight=lambda x: x[1], im_range=[0, 10, 0, 10], resolution=[100, 100])
+                res = PI.fit_transform(diagsT)
 
-            PI = tda.PersistenceImage(**kwargs)
-            # PI = tda.PersistenceImage(bandwidth=1.0, weight=arctan(1.0, 1.0), im_range=[0, 1, 0, 1], resolution=[25, 25])
-            res = PI.fit_transform(diagsT)
+            if False:
+                diagsT = tda.DiagramPreprocessor(use=True, scalers=[([0, 1], tda.BirthPersistenceTransform())]).fit_transform(self.diags)
+
+                kwargs = filterdict(kwargs, ['bandwidth', 'weight', 'im_range', 'resolution'])
+                kwargs['weight'] = arctan(kwargs['weight'][0], kwargs['weight'][1])
+
+                # PI = tda.PersistenceImage(**kwargs)
+                PI = tda.PersistenceImage(bandwidth=1., weight=lambda x: x[1], im_range=[0, 10, 0, 10], resolution=[100, 100])
+
+                # PI = tda.PersistenceImage(bandwidth=1.0, weight=arctan(1.0, 1.0), im_range=[0, 1, 0, 1], resolution=[25, 25])
+                res = PI.fit_transform(diagsT)
 
         elif self.vec_type == 'pl':
             kwargs = filterdict(kwargs, ['num_landscapes', 'resolution'])
             LS = tda.Landscape(**kwargs)
             # LS = tda.Landscape(num_landscapes=5, resolution=100)
-            res = LS.fit_transform(self.diags)
+            print('self.diags', self.diags[1], self.diags[2])
+            diags = [np.array(diag) for diag in self.diags]
+            D = np.array([[0., 4.], [1., 2.], [3., 8.], [6., 8.]])
+
+            res = LS.fit_transform([D, D])
+
+            # matheiu's implementation
+            LS = Landscape(resolution=1000)
+            D = np.array([[0., 4.], [1., 2.], [3., 8.], [6., 8.]])
+            diags = [D]
+
+            L = LS.fit_transform(diags)
+
 
         elif self.vec_type == 'pervec': # permutation vector, i.e. the historgram of coordinates of dgm
             dgms = self.dgms
@@ -108,10 +136,10 @@ class pdvector():
         for p in dgm: assert p.death >= p.birth
         data = [tuple(i) for i in dgm2diag(dgm)]
         try:
-            [list1, list2] = zip(*data);
+            [list1, list2] = zip(*data)
         except:
             print('Problem')
-            list1 = [0];
+            list1 = [0]
             list2 = [1e-5]  # adds a dummy 0
 
         if dynamic_range_flag == True:
@@ -148,6 +176,7 @@ class pdvector():
             point = (point[0], point[1])
             rotated.append(point)
         return rotated
+
     @staticmethod
     def draw_data(data, imax, imin, discrete_num=500):
         """
@@ -287,15 +316,19 @@ if __name__ == '__main__':
     dgms = [dgm] * 10
     labels = np.array([1, -1]*50)
 
-    params = {'bandwidth': 1.0, 'weight': (1, 1), 'im_range': [0, 1, 0, 1], 'resolution': [5, 5]}
-    image = dgms2vec(dgms, vectype='pi', **params)
-    images = merge_dgms(dgms, dgms, dgms, ss=True, epd=True, vectype='pi', **params)
-    print (np.shape(image), np.shape(images))
-
+    # todo pl has problem
     params = {'num_landscapes': 5, 'resolution': 100}
     landscape = dgms2vec(dgms, vectype='pl', **params)
     landscapes = merge_dgms(dgms, dgms, dgms, vectype='pl', **params)
     print (np.shape(landscape), np.shape(landscapes))
+    sys.exit()
+    # todo pi has some problem
+    params = {'bandwidth': 1.0, 'weight': (1, 1), 'im_range': [0, 1, 0, 1], 'resolution': [5, 5]}
+    image = dgms2vec(dgms, vectype='pi', **params)
+    images = merge_dgms(dgms, dgms, dgms, ss=True, epd=True, vectype='pi', **params)
+    print (np.shape(image), np.shape(images))
+    sys.exit()
+
 
     pd_vector = dgms2vec(dgms, vectype ='pvector')
     pd_vectors = merge_dgms(dgms, dgms, dgms, vectype = 'pvector')

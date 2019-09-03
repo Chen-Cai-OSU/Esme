@@ -5,9 +5,11 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from Esme.helper.time import timefunction
+from Esme.helper.format import precision_format
+from Esme.dgms.fil import nodefeat
 import time
 
-# @timefunction
+@timefunction
 def hks(g, t):
     t0 = time.time()
     lap = normalized_laplacian_matrix(g).toarray()
@@ -16,13 +18,25 @@ def hks(g, t):
     for i in range(len(w)):
         hks += np.exp(-t * w[i]) * np.multiply(v[i,:], v[i,:])
     hks = hks.reshape(len(v),1)
-    if len(g) > 20:
-        print(f'hks for graph of size {len(g)} and t {t} takes {time.time()-t0}')
+    if len(g) > 20 and time.time()-t0 > 5:
+        print(f'hks for graph of nodes/edges {len(g)}/{len(g.edges())} and t {t} takes {precision_format(time.time()-t0, 2)}')
     return hks
 
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+parser = ArgumentParser("scoring", formatter_class=ArgumentDefaultsHelpFormatter, conflict_handler='resolve')
+parser.add_argument("--size", default=1000, type=int, help='The size of graph') # (1515, 500) (3026,)
+
 if __name__ == '__main__':
-    g = nx.random_geometric_graph(2000, 0.1)
+    args = parser.parse_args()
+    # g = nx.random_geometric_graph(args.size, 0.01)
+    g = nx.random_tree(n = args.size)
+    print(nx.info(g))
     hks_feat = hks(g, 1)
+
+    t0 = time.time()
+    feat = nodefeat(g, 'fiedler')
+    print(f'fielder takes {time.time() - t0}')
+
     print(hks_feat.shape)
     sys.exit()
 

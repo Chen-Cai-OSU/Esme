@@ -20,6 +20,7 @@ def plot_example(face, pos):
     :param pos: array coordinates of shape (n_pts, 3)
     :return:
     """
+
     assert face.shape[0] == pos.shape[1] == 3
     import plotly.graph_objects as go
     fig = go.Figure(data=[
@@ -39,7 +40,16 @@ def plot_example(face, pos):
     ])
     fig.show()
 
+def plot_off(file='1'):
+    from Esme.shape.util import off_face, off_pos
+    face = off_face(file)
+    pos = off_pos(file)
+    print(face.shape, pos.shape)
+    plot_example(face.T, pos)
+
 if __name__ == '__main__':
+    plot_off(file='1')
+    sys.exit()
     pos = np.array([[0.1, 1, 2, 0], [0, 0, 1, 2], [0, 2, 0, 1]]).T
     face = np.array([[0,0,0,1], [1,2,3,2], [2,3,1,3]])
     print(pos.shape, face.shape)

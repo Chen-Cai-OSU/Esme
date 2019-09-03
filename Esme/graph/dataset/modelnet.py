@@ -1,3 +1,4 @@
+import numpy as np
 import os.path as osp
 import networkx as nx
 from torch_geometric.transforms import FaceToEdge
@@ -5,11 +6,21 @@ from torch_geometric.datasets import ModelNet
 from Esme.graph.dataset.qm9 import  graphs_stat
 import torch_geometric.transforms as T
 import sys
-
+from Esme.helper.load_graph import component_graphs
+from Esme.helper.time import timefunction
 import torch
 from torch_geometric.utils import to_undirected
-import numpy as np
-def torch_geometric_2nx(dataset, labels_only = False, print_flag = False):
+
+@timefunction
+def torch_geometric_2nx(dataset, labels_only = False, print_flag = False, weight_flag = False):
+    """
+    :param dataset:
+    :param labels_only: return labels only
+    :param print_flag:
+    :param weight_flag: whether computing distance as weights or not
+    :return:
+    """
+    import numpy as np
     graphs, labels = [], []
 
     if labels_only:
@@ -20,14 +31,43 @@ def torch_geometric_2nx(dataset, labels_only = False, print_flag = False):
     for i in range(len(dataset)):
         edges = dataset[i].edge_index # tensor of shape [2, n_edges * 2]
         n_edge = edges.shape[1] // 2
-        edges = np.array(edges)
-        # edges = np.array([[ 0,  0,  1,  1 ], [ 1,  9,  0,  2]])
+        edges = edges.numpy() # edges = np.array([[ 0,  0,  1,  1 ], [ 1,  9,  0,  2]])
         edges_lis = list(edges.T)
+        edge_lis_ = set([edge[0] for edge in edges_lis] + [edge[1] for edge in edges_lis])
         edges_lis = [(edge[0], edge[1]) for edge in edges_lis]
-        g  = nx.from_edgelist(edges_lis)
+        g = nx.from_edgelist(edges_lis)
+
+        assert len(edge_lis_) == len(g) # check nx.from_edgelist is right
+        assert len(g.edges) == n_edge # check nx.from_edgelist is right
+
+        if weight_flag:
+            # set the pos for graph
+            pos = dataset[i].pos.numpy()
+            assert max(g.nodes()) <= pos.shape[0]
+
+            try:
+                assert pos.shape == (len(g), 3)
+            except:
+                print(f'Isolated pts. pos shape {pos.shape}, n_node is {len(g)}') # todo: need to check with pytorch_geo
+
+            pos_dict = dict()
+            for k in g.nodes():
+                pos_dict[k] = tuple(pos[k, :])
+            g = nx.from_edgelist(edges_lis)
+
+            for node, value in pos_dict.items():
+                g.node[node]['pos'] = value
+
+            # compute the edge weight
+            for u,v in g.edges():
+                pos1, pos2 = g.node[u]['pos'], g.node[v]['pos']
+                pos1, pos2 = np.array(pos1), np.array(pos2)
+                g[u][v]['dist'] = np.linalg.norm(pos1 - pos2)
+
         graphs.append(g)
         assert len(g.edges) == n_edge
-        labels.append(int(dataset[i].y[0]))
+        label = dataset[i].y
+        labels.append(int(label))
 
         if print_flag: print(i)
     return graphs, labels
@@ -53,30 +93,30 @@ def load_modelnet(version='10', point_flag = False):
     return train_dataset, test_dataset
 
 @timefunction
-def modelnet2graphs(version = '40', print_flag = False, labels_only = False, a = 0, b = 10):
+def modelnet2graphs(version = '10', print_flag = False, labels_only = False, a = 0, b = 10, weight_flag = False):
     """ load modelnet 10 or 40 and convert to graphs"""
 
     train_dataset, test_dataset = load_modelnet(version, point_flag = False)
     all_dataset = train_dataset + test_dataset
     n = len(all_dataset)
-    print(test_dataset[10])
-    sys.exit()
 
     if labels_only:
         labels = []
         for i in range(n):
-            lab = int(data[i].y)
+            lab = int(all_dataset[i].y)
             labels.append(lab)
         return None, labels
 
     datasets = []
     assert b < n
-    for i in range(a,b):
-        tmp = FaceToEdge()(all_dataset[i]) if version=='10' else all_dataset[i] # TODO a bug. should report to pytorch geometric
-        datasets.append(tmp)
-        if i % 10==0 and print_flag: print(i)
 
-    graphs, labels = torch_geometric_2nx(datasets, print_flag=print_flag)
+    for i in range(a,b):
+        tmp = FaceToEdge()(all_dataset[i]) if version=='10' else all_dataset[i] # TODO a bug here. should report to pytorch geometric
+        datasets.append(tmp)
+        if (i % 10==0 and print_flag): print(i)
+
+    graphs, labels = torch_geometric_2nx(datasets, print_flag=print_flag, weight_flag= weight_flag)
+    assert len(graphs) == b - a
     return graphs, labels
 
 def modelnet2points(version, idx = 1):
@@ -91,9 +131,37 @@ def modelnet2points(version, idx = 1):
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 parser = ArgumentParser("scoring", formatter_class=ArgumentDefaultsHelpFormatter, conflict_handler='resolve')
 parser.add_argument("--test_size", default=20, type=int, help='test size')
+parser.add_argument("--w", action='store_true', help='use weight or not')
+parser.add_argument("--idx", default=5, type=int, help='index') # only 335 nodes
 
 if __name__ == '__main__':
-    idx = 100
+    # viz 3d graph
+    args = parser.parse_args()
+    idx = args.idx
+    version = '10'
+    train_dataset, test_dataset = load_modelnet(version, point_flag=False)
+    print(len(test_dataset[idx].pos))
+
+    data = FaceToEdge()(test_dataset[idx]) if version=='10' else test_dataset[idx]
+    print(data)
+    gs, _ = torch_geometric_2nx([data], weight_flag=args.w)
+    g = component_graphs(gs[0])[0]
+    from Esme.dgms.fil import nodefeat # do to move up. otherwise will have circular import with fil.py
+    print(nodefeat(g, 'fiedler')[:5])
+
+    sys.exit()
+    from Esme.viz.graph import viz_mesh_graph, network_plot_3D
+
+    edge_index, pos = data.edge_index.numpy(), data.pos.numpy()
+    g = viz_mesh_graph(edge_index, pos, viz_flag=False)  # generate_random_3Dgraph(n_nodes=n, radius=0.25, seed=1)
+    components_size = [len(c) for c in sorted(nx.connected_components(g), key=len, reverse=True)]
+    print(components_size)
+
+    sys.exit()
+    network_plot_3D(g, 0, save=False)
+
+    # viz 3d mesh
+    idx = 10
     train_dataset, test_dataset = load_modelnet('10', point_flag = False)
     data = train_dataset[idx]
     face, pos = data.face.numpy(), data.pos.numpy()
@@ -101,6 +169,11 @@ if __name__ == '__main__':
     from Esme.viz.pointcloud import plot_example
     plot_example(face=face, pos=pos)
     sys.exit()
+
+
+
+
+
     args = parser.parse_args()
     version = '10'
     for idx in range(1,1000, 100):

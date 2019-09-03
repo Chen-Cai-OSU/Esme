@@ -1,22 +1,24 @@
 # from importlib import reload  # Python 3.4+ only.
 import matplotlib
 matplotlib.use('tkagg')
-import matplotlib.pyplot as plt
 import collections
-import matplotlib.pyplot as plt
-# import networkx as nx
+import sys
 import networkx as nx
-
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+import numpy as np
+import random
 
 def viz_graph(g, node_size = 5, edge_width = 1, node_color = 'b', color_bar = False, show = False):
     # g = nx.random_geometric_graph(100, 0.125)
-    pos = nx.spring_layout(g)
+    pos = nx.spring_layout(g, seed=1)
     nx.draw(g, pos, node_color=node_color, node_size=node_size, with_labels=False, width = edge_width)
     if color_bar:
         # https://stackoverflow.com/questions/26739248/how-to-add-a-simple-colorbar-to-a-network-graph-plot-in-python
         sm = plt.cm.ScalarMappable( norm=plt.Normalize(vmin=min(node_color), vmax=max(node_color)))
         sm._A = []
         plt.colorbar(sm)
+    plt.title(f'graph of {len(g)}/{len(g.edges)}')
     if show: plt.show()
 
 def test():
@@ -80,8 +82,117 @@ def viz_deghis(G):
 
     plt.show()
 
+def viz_mesh_graph(edge_index, pos, viz_flag = True):
+    """
+    :param edge_index: np.array of shape (2, 2*num_edge)
+    :param pos: np.array of shape (n_pts, 3)
+    :return: viz mesh graph
+    """
+    n_node = pos.shape[0]
+    n_edge = edge_index.shape[1] // 2
 
+    edges = edge_index # np.array([[ 0,  0,  1,  1 ], [ 1,  9,  0,  2]])
+    edges_lis = list(edges.T)
+    edges_lis = [(edge[0], edge[1]) for edge in edges_lis]
 
+    pos_dict = dict()
+    for i in range(n_node):
+        pos_dict[i] = tuple(pos[i,:])
+
+    g = nx.from_edgelist(edges_lis)
+    for node, value in pos_dict.items():
+        g.node[node]['pos'] = value
+    assert len(g) == n_node
+    assert len(g.edges()) == n_edge
+
+    if not viz_flag: return g
+
+    nx.draw(g, pos_dict)
+    plt.show()
+
+def generate_random_3Dgraph(n_nodes, radius, seed=None):
+    if seed is not None:
+        random.seed(seed)
+
+    # Generate a dict of positions
+    pos = {i: (random.uniform(0, 1), random.uniform(0, 1), random.uniform(0, 1)) for i in range(n_nodes)}
+
+    # Create random 3D network
+    G = nx.random_geometric_graph(n_nodes, radius, pos=pos)
+
+    return G
+
+def network_plot_3D(G, angle, save=False, feat = None):
+    # https://www.idtools.com.au/3d-network-graphs-python-mplot3d-toolkit/
+    # Get node positions
+    pos = nx.get_node_attributes(G, 'pos')
+
+    # Get number of nodes
+    n = G.number_of_nodes()
+
+    if feat == None:
+        edge_max = max([G.degree(i) for i in range(n)])
+        colors = [plt.cm.plasma(G.degree(i) / edge_max) for i in range(n)]
+    else:
+        assert len(feat) == n
+        feat_max = max(abs(feat))
+        colors = [plt.cm.plasma(feat[i] / feat_max) for i in range(n)]
+
+    # 3D network plot
+    with plt.style.context(('ggplot')):
+        fig = plt.figure(figsize=(10, 7))
+        ax = Axes3D(fig)
+
+        # Loop on the pos dictionary to extract the x,y,z coordinates of each node
+        for key, value in pos.items():
+            xi = value[0]
+            yi = value[1]
+            zi = value[2]
+
+            # Scatter plot
+            ax.scatter(xi, yi, zi, c=colors[key], s=1, edgecolors='k', alpha=0.7)
+
+        # Loop on the list of edges to get the x,y,z, coordinates of the connected nodes
+        # Those two points are the extrema of the line to be plotted
+        for i, j in enumerate(G.edges()):
+            x = np.array((pos[j[0]][0], pos[j[1]][0]))
+            y = np.array((pos[j[0]][1], pos[j[1]][1]))
+            z = np.array((pos[j[0]][2], pos[j[1]][2]))
+
+            # Plot the connecting lines
+            ax.plot(x, y, z, c='black', alpha=0.2)
+
+    # Set the initial view
+    ax.view_init(30, angle)
+
+    # Hide the axes
+    ax.set_axis_off()
+
+    if save is not False:
+        # plt.savefig("C:\scratch\\data\"+str(angle).zfill(3)+".png  ")
+        plt.close('all')
+    else:
+        plt.show()
+    return
 
 if __name__=='__main__':
+    import networkx as nx
+    # g = nx.random_geometric_graph(1000, 0.1)
+    g = generate_random_3Dgraph(n_nodes=100, radius=0.25, seed=1)
+    network_plot_3D(g, 0, save=False)
+
+    sys.exit()
+    n = 100
+    edge_index = np.array([[0, 0, 1, 1, 2, 2],
+                           [1, 2, 0, 2, 0, 1]])
+    pos = np.array([[1, 2, 3],
+                    [2.1, 3, 5],
+                    [1, 1, 2.2]])
+    # pos = pos[:, 0:2]
+
+    g= viz_mesh_graph(edge_index, pos, viz_flag=False) # generate_random_3Dgraph(n_nodes=n, radius=0.25, seed=1)
+
+    sys.exit()
+    viz_mesh_graph(edge_index, pos)
+    sys.exit()
     test()

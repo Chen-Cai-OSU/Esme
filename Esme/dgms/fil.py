@@ -1,7 +1,7 @@
 """ Implement different filtration stradegies for graphs """
 
 import sys
-
+import time
 import dionysus as d
 import networkx as nx
 import numpy as np
@@ -18,9 +18,15 @@ from Esme.graphonlib.smoothing.zhang import smoother
 from Esme.helper.debug import debug
 from Esme.helper.load_graph import component_graphs
 from Esme.helper.load_graph import load_graphs
-from Esme.helper.time import timefunction
+from Esme.helper.time import timefunction, time_node_fil
 from Esme.dgms.fake import array2dgm
 from Esme.dgms.ioio import dgms_dir_test, load_dgms, save_dgms
+from Esme.graph.dataset.modelnet import modelnet2graphs
+from Esme.dgms.format import export_dgm
+from Esme.helper.dgms import check_single_dgm
+import os
+from Esme.helper.dgms import check_partial_dgms
+
 np.random.seed(42)
 
 class fil_stradegy():
@@ -233,6 +239,7 @@ class graph2dgm():
             return d.Diagram([[0,0]])
         return dgms
 
+    @timefunction
     def get_diagram(self, g, key='fv', subflag = 'True', one_homology_flag=False, parallel_flag = False, zigzag = False):
         """
 
@@ -376,6 +383,7 @@ def edgefeat(g, fil='ricci', agg = 'min', norm = False):
     nodefeat = np.array(nodefeat).reshape(len(g),1)
     return nodefeat
 
+@timefunction
 def nodefeat(g, fil, norm = False, **kwargs):
     """
     :param g:
@@ -383,6 +391,7 @@ def nodefeat(g, fil, norm = False, **kwargs):
     :return: node feature (np.array of shape (n_node, 1))
     """
     # g = nx.random_geometric_graph(100, 0.2)
+    t0 = time.time()
     assert nx.is_connected(g)
 
     if fil == 'deg':
@@ -398,9 +407,34 @@ def nodefeat(g, fil, norm = False, **kwargs):
         length = nx.single_source_dijkstra_path_length(g, base) # dict #
         nodefeat = [length[i] for i in range(len(g))]
         nodefeat = np.array(nodefeat).reshape(len(g),1)
+
     elif fil == 'fiedler':
-        nodefeat = fiedler_vector(g, normalized=False)  # np.ndarray
-        nodefeat = nodefeat.reshape(len(g), 1)
+        if len(g.edges) == 2* len(g): # todo hack here. fielder is very slow when n_edges = 2*n_edge
+            nodefeat = np.array(list(dict(nx.degree(g)).values())).reshape(len(g), 1)
+        else:
+            nodefeat = fiedler_vector(g, normalized=False)  # np.ndarray
+            nodefeat = nodefeat.reshape(len(g), 1)
+
+    elif fil == 'fiedler_w':
+        if False: # len(g.edges) == 2 * len(g):  # todo hack here. fielder is very slow when n_edges = 2*n_edge
+            nodefeat = np.array(list(dict(nx.degree(g)).values())).reshape(len(g), 1)
+        else:
+            for u,v in g.edges():
+                try:
+                    assert 'dist' in g[u][v].keys()
+                    g[u][v]['dist'] += 1e-6
+                except AssertionError:
+                    pass
+                    # print(f'g[{u}][{v}] = {g[u][v]}')
+            print(f'bottleneck graph {len(g)}/{len(g.edges())}')
+            # for line in nx.generate_edgelist(g):
+            #     print(line)
+            print('-'*50)
+            nodefeat = fiedler_vector(g, normalized=False, weight='dist', method='tracemin_lu')  # np.ndarray
+            print('after true fiedler')
+            nodefeat = nodefeat.reshape(len(g), 1)
+
+
     elif fil == 'ricci':
         try:
             g = ricciCurvature(g, alpha=0.5, weight='weight')
@@ -421,6 +455,11 @@ def nodefeat(g, fil, norm = False, **kwargs):
 
     # normalize
     if norm: nodefeat = nodefeat / float(max(abs(nodefeat)))
+    if time.time()-t0 >3:
+        from Esme.helper.time import precision_format
+        print(f'nodefeat takes {precision_format(time.time()-t0, 2)} for g {len(g)}/{len(g.edges)}')
+        from Esme.viz.graph import viz_graph
+        # viz_graph(g, show=True)
     return nodefeat
 
 def node_fil(g = None, fil = 'deg', norm = False, one_hom = False, **kwargs):
@@ -446,6 +485,7 @@ def node_fil(g = None, fil = 'deg', norm = False, one_hom = False, **kwargs):
     diagram = x.get_diagram(g, key='fv', subflag='True', one_homology_flag=one_hom, parallel_flag=False, zigzag=False)
     return diagram
 
+# @time_node_fil
 def node_fil_(g = None, fil = 'deg', fil_d = 'sub', norm = False, one_hom = False, **kwargs):
     """
     sublevel filtration
@@ -514,9 +554,19 @@ def g2dgm(i, g=None, fil='deg', fil_d = 'sub', norm=False, one_hom=False, debug_
     # assert 'gs' in globals().keys()
     # g = gs[i].copy()
 
+    if len(g) > 60000:
+        return d.Diagram([[0,0]]) # todo better handling
+
     if debug_flag:
         print('in g2dm', kwargs)
-        print('processing %s-th graph where fil is %s and fil_d is %s' % (i, fil, fil_d))
+        i += kwargs.get('a', 0)
+        print(f'processing {i}-th graph({len(g)}/{len(g.edges)}) where fil is {fil} and fil_d is {fil_d} and one_hom is {one_hom}')
+
+    if kwargs['write'] == True:  # 一个后门
+        fil_d_ = 'epd' if one_hom == True else  fil_d
+        if check_single_dgm(graph = 'mn'+version, fil = fil, fil_d=fil_d_, norm=norm, idx=i): return
+
+
     components = component_graphs(g)
     dgm = d.Diagram([])
     for component in components:
@@ -524,11 +574,16 @@ def g2dgm(i, g=None, fil='deg', fil_d = 'sub', norm=False, one_hom=False, debug_
             tmp_dgm = edge_fil_(component, fil=fil, fil_d=fil_d, norm=norm, one_hom=one_hom, **kwargs)
             print_dgm(tmp_dgm)
         else:
-            tmp_dgm = node_fil_(component, fil=fil, fil_d=fil_d, norm=norm, one_hom=one_hom, **kwargs)
+            tmp_dgm = node_fil_(g = component, fil=fil, fil_d=fil_d, norm=norm, one_hom=one_hom, **kwargs)
 
         dgm = add_dgm(dgm, tmp_dgm)
         dgm = dgm_filter(dgm)
     dgm = dgm_filter(dgm) # handle the case when comonents is empty
+
+    if kwargs['write'] == True: # 一个后门
+        if one_hom == True: fil_d = 'epd'
+        dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/', 'mn' + version, fil, fil_d,'norm_' + str(norm), '')
+        export_dgm(dgm, dir=dir, filename=  str(i) +'.csv', print_flag=True)
     return dgm
 
 
@@ -590,13 +645,18 @@ def gs2dgms(gs, fil='deg', fil_d = 'sub', norm=False, one_hom=False, debug_flag 
     dgms = []
     for i in range(len(gs)):
         if debug_flag:
-            print('processing %s-th graph where fil is %s and fil_d is %s'%(i, fil, fil_d))
-        components = component_graphs(gs[i])
+            print(f'process {i}-th graph({len(gs[i])}/{len(nx.edges(gs[i]))}) where one_hom is {one_hom} fil is {fil} and fil_d is {fil_d}')
+
+        components = component_graphs(gs[i]) # todo chnage back to 4
+        # components4 = component_graphs(gs[i], threshold=4) #todo
+        # components5 = component_graphs(gs[i], threshold=5) #todo
+
+        # print(f'threshold 4/5 has {len(components4)}/{len(components5)}')
         if len(components)==0: return d.Diagram([[0,0]])
 
         dgm = d.Diagram([])
         for component in components:
-            tmp_dgm = node_fil_(component, fil=fil, fil_d = fil_d, norm=norm, one_hom=one_hom, **kwargs)
+            tmp_dgm = node_fil_(g = component, fil=fil, fil_d = fil_d, norm=norm, one_hom=one_hom, **kwargs)
             dgm = add_dgm(dgm, tmp_dgm)
             dgm = dgm_filter(dgm)
             # TODO: implement edge_fil_
@@ -612,27 +672,78 @@ def dgm_filter(dgm):
     else:
         return d.Diagram([[0,0]])
 
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+parser = ArgumentParser("scoring", formatter_class=ArgumentDefaultsHelpFormatter, conflict_handler='resolve')
+parser.add_argument("--a", default=0, type=int, help='write files in batch. a is beginner')
+parser.add_argument("--b", default=100, type=int, help='write files in batch. b is ender')
+parser.add_argument("--n_jobs", default=1, type=int, help='n_jobs')
+parser.add_argument("--step_size", default=1, type=int, help='step size for sampling')
+
+parser.add_argument("--parallel", action='store_true', help='use parallel or not')
+parser.add_argument("--sub", action='store_true', help='compute sub only')
+parser.add_argument("--sup", action='store_true', help='compute sup only')
+parser.add_argument("--epd", action='store_true', help='compute epd only')
+parser.add_argument("--all", action='store_true', help='compute epd only')
+
 if __name__ == '__main__':
     # g = nx.random_geometric_graph(100, 0.3)
     # nodefeat = edgefeat(g, fil='ricci', agg='min', norm=False)
     # print(nodefeat.shape)
 
     # compute for graphs that are larger than memory
-    if False:
-        from Esme.graph.dataset.modelnet import modelnet2graphs
-        version = '10'
-        gs, labels = modelnet2graphs(version=version, print_flag=True, a = 0, b = 100)
-        norm = False # todo: change to True
-        for fil in ['hks_1', 'hks_10', 'hks_0.1']:
-            n_jobs = 1
-            for ntda in [False]:
-                subdgms = gs2dgms(gs=gs, n_jobs=n_jobs, fil=fil, fil_d='sub', norm=norm, graph = 'mn' + version, ntda = ntda, debug_flag = True)
-                for i in range(a,b):
-                    from Esme.dgms.format import export_dgm
-                    dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/mn10/', fil, 'sub/norm_False' )
-                    print(dir)
-                    export_dgm(subdgms[i-a], dir=dir, filename=i+'.csv')
-        sys.exit()
+    args = parser.parse_args()
+    version = '10'
+    a, b, n_jobs = args.a, args.b, args.n_jobs
+    fil = 'fiedler_w' # 'fiedler'
+
+    kw = {'a':a, 'b':b, 'fil': fil}
+    if check_partial_dgms(**kw, fil_d='sub') and check_partial_dgms(**kw, fil_d='sup') and check_partial_dgms(**kw, fil_d='epd') : sys.exit()
+
+    gs, labels = modelnet2graphs(version=version, print_flag=True, a = a, b = b, weight_flag=True) # todo weight_flag is false for fiedler
+    norm, ntda = True, False
+
+    for fil in [fil]: # ['hks_1']: #['hks_1', 'hks_10', 'hks_0.1']:
+
+        if args.parallel:
+            kwargs = {'fil': fil, 'fil_d': 'sub', 'norm': norm, 'graph': 'mn' + version, 'ntda': ntda, 'debug_flag': True}
+
+            kwargs['write'] = True # for testing the new way for parallem computing
+            kwargs['a'] = a
+
+            if args.sub or args.all:
+                subdgms = Parallel(n_jobs=n_jobs, backend='multiprocessing')(delayed(g2dgm)(i, gs[i], **kwargs) for i in range(0, len(gs),args.step_size))
+                del subdgms
+
+            if args.sup or args.all:
+                kwargs['fil_d'] = 'sup'
+                supdgms = Parallel(n_jobs=n_jobs, backend='multiprocessing')(delayed(g2dgm)(i, gs[i], **kwargs) for i in range(0, len(gs),args.step_size))
+                del supdgms
+
+            if args.epd or args.all:
+                kwargs['one_hom'] = True
+                epddgms = Parallel(n_jobs=n_jobs, backend='multiprocessing')(delayed(g2dgm)(i, gs[i], **kwargs) for i in range(0, len(gs),args.step_size))
+                del epddgms
+
+        else:
+            # subdgms = gs2dgms(gs, n_jobs=n_jobs, fil=fil, fil_d='sub', norm=norm, graph = 'mn' + version, ntda = ntda, debug_flag = True)
+            supdgms = gs2dgms(gs, n_jobs=n_jobs, fil=fil, fil_d='sup', norm=norm, graph='mn' + version, ntda=ntda, debug_flag=True)
+            # epddgms = gs2dgms(gs, fil=fil, one_hom=True, norm=norm, graph='mn' + version, ntda=ntda, debug_flag=True, n_jobs=n_jobs)
+
+        continue
+        for i in range(a,b):
+            dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/mn10/', fil, 'sub/norm_True/' )
+            export_dgm(subdgms[i-a], dir=dir, filename= str(i) +'.csv')
+
+            dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/mn10/', fil, 'sup/norm_True/')
+            export_dgm(supdgms[i - a], dir=dir, filename=str(i) + '.csv')
+
+            dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/mn10/', fil, 'epd/norm_True/')
+            export_dgm(epddgms[i - a], dir=dir, filename=str(i) + '.csv')
+
+    sys.exit()
+
+
+
     # computing dgms for replicate.py
     graph = 'cox2'
     for graph in  ['bzr', 'cox2', 'dhfr', 'dd_test', 'nci1',  'frankenstein', 'protein_data',   'imdb_binary',  'imdb_multi', 'reddit_binary', 'reddit_5K']:
