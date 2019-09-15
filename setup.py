@@ -19,7 +19,10 @@ setuptools.setup(
         "sklearn",
         "joblib",
         'cvxpy',
-        'torch_geometric'
+        'torch_geometric',
+        'torch_sparse',
+        'gensim',
+        'pygsp'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

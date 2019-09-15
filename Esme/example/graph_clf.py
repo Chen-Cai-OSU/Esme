@@ -28,14 +28,14 @@ if __name__ == '__main__':
     labels = [1] * n + [2] * n
 
     # node filtration is fiedler vector.
-    edge_kwargs = {'h': 0.3, 'edgefunc': 'edge_prob'}
-    for i in range(len(gs)):
-        g = gs[i]
-        lp = LaplacianEigenmaps(d=1)
-        lp.learn_embedding(g, weight='weight')
-        lapfeat = lp.get_embedding()
-        gs[i] = fil_strategy(g, lapfeat, method=fil_method, viz_flag=False, **edge_kwargs)
-    print('Finish computing lapfeat')
+    # edge_kwargs = {'h': 0.3, 'edgefunc': 'edge_prob'}
+    # for i in range(len(gs)):
+    #     g = gs[i]
+    #     lp = LaplacianEigenmaps(d=1)
+    #     lp.learn_embedding(g, weight='weight')
+    #     lapfeat = lp.get_embedding()
+    #     gs[i] = fil_strategy(g, lapfeat, method=fil_method, viz_flag=False, **edge_kwargs)
+    # print('Finish computing lapfeat')
 
     # compute diagrams
     dgms = gs2dgms(gs, fil='deg', fil_d='sub', norm=True)

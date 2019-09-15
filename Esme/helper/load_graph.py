@@ -4,6 +4,8 @@ import time
 import numpy as np
 import networkx as nx
 import sys
+import os.path as osp
+
 
 from Esme.helper.io_related import make_dir
 from Esme.helper.time import timefunction

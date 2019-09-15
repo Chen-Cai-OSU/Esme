@@ -1,3 +1,5 @@
+""" laplacian eigenmap """
+
 import networkx as nx
 import numpy as np
 import scipy.sparse.linalg as lg
