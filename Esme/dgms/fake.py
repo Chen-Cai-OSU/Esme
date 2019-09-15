@@ -4,6 +4,7 @@ functions related to generate fake diagrams from true diagrams
 
 from Esme.dgms.format import dgm2diag, diag2dgm
 from Esme.dgms.test import randomdgms
+from Esme.helper.time import timefunction
 from Esme.dgms.stats import print_dgm, dgm_filter
 import networkx as nx
 from numpy import random
@@ -22,15 +23,18 @@ def coordinate(dgm, dim = 100):
         assert -1 -tor <= min(coordinates)
         assert max(coordinates) <= 1 + tor
     except AssertionError:
-        print('min and max of coordinates is %s and %s'%(min(coordinates), max(coordinates)))
-        sys.exit()
+        norm = np.max(np.abs(np.array(coordinates)))
+        coordinates = [num/float(norm) for num in coordinates]
+        # print('min and max of coordinates is %s and %s. Exit'%(min(coordinates), max(coordinates)))
+        # sys.exit()
     vec,_ = np.histogram(coordinates, bins=dim, range=[-1,1])
     return vec.reshape((1,dim))
 
 def permute(dgm, seed=42, seed_flag = True):
     """
     :param dgm: diagram in dionysus form
-    :param seed:
+    :param seed: random seed
+    :param seed_flag: if set seed or not
     :return:
     """
 
@@ -121,6 +125,8 @@ def fake_diagrams(graphs_, dgms, true_dgms = ['null']*10000, attribute='deg', se
         fake_dgms.append(tmp_dgm)
     return fake_dgms
 
+
+@timefunction
 def permute_dgms(dgms, permute_flag = False, permute_ratio = 1, seed=42, seed_flag = True):
     """
     :param dgms: a list of dgm
@@ -150,18 +156,15 @@ def permute_dgms(dgms, permute_flag = False, permute_ratio = 1, seed=42, seed_fl
     else:
         return dgms
 
-
-
 if __name__ == "__main__":
     dgm = d.Diagram([[1,2], [3,4], [5,6], [7,8]])
     from Esme.dgms.format import normalize_dgm
     dgm = normalize_dgm(dgm)
     x = coordinate(dgm, dim=20)
     print(x,x.shape)
-    sys.exit()
 
-    dgms = [dgm] * 10
-    dgms = permute_dgms(dgms, permute_flag=True, permute_ratio=0.5)
+    dgms = [dgm] * 3
+    dgms = permute_dgms(dgms, permute_flag=True, permute_ratio=1, seed_flag=False, seed=49)
     for dgm in dgms:
         print_dgm(dgm)
         print()

@@ -46,7 +46,7 @@ def slice_dict(d, keys):
     keys = intersection(keys, d.keys())
     return dict((k, d[k]) for k in keys)
 
-
+@timefunction
 def sacred_to_df(db_runs, mongo_query=None, ):
     """
     db_runs is usually db.runs
@@ -228,6 +228,8 @@ def check_duplicate(db, param):
 
     if param.get('graph', None) in ['frankenstein', 'reddit_binary', 'reddit_5K', 'reddit_12K', 'nci1', 'nci109', 'collab']:
         pass  # do nothing when graph is large
+    if param.get('feat', None) in ['pf']:
+        pass
     else:
         return False  # when graph is small, it doesn't save time to check duplication. Just run exp again.
 

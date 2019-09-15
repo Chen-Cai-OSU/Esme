@@ -32,7 +32,7 @@ def sw(dgms1, dgms2, kernel_type='sw', parallel_flag=False, **featkwargs):
         raise Exception("Timed out!")
 
     signal.signal(signal.SIGALRM, signal_handler)
-    time_limit = max(int(len(dgms1)*len(dgms2)* 0.1),100)
+    time_limit = max(int(len(dgms1)*len(dgms2)* 0.2),100)
     signal.alarm(time_limit)
 
     if parallel_flag==False:
@@ -47,7 +47,13 @@ def sw(dgms1, dgms2, kernel_type='sw', parallel_flag=False, **featkwargs):
             tda_kernel = tda.PersistenceWeightedGaussianKernel(bandwidth=featkwargs['bw'], weight=arctan(featkwargs['K'], featkwargs['p']))
         elif kernel_type ==  'pf':
             assert_names(['bw', 'bwf'], featkwargs)
+            # try:
             tda_kernel = tda.PersistenceFisherKernel(bandwidth_fisher=featkwargs['bwf'], bandwidth=featkwargs['bw'])
+            # except RuntimeWarning:
+                # tda_kernel = 0
+                # print('RuntimeWarning catched')
+                # print(f'dgm1', dgms1)
+                # print(f'dgm2', dgms2)
         else:
             print ('Unknown kernel for function sw')
 
@@ -80,7 +86,7 @@ def sw_parallel(dgms1, dgms2, kernel_type='sw', parallel_flag=True, granularity=
 
     if parallel_flag:
         # parallel version
-        kernel = Parallel(n_jobs=-1)(delayed(sw)(dgms1, dgms2[i:min(i+granularity, n2)], kernel_type=kernel_type,
+        kernel = Parallel(n_jobs=-1, backend='multiprocessing')(delayed(sw)(dgms1, dgms2[i:min(i+granularity, n2)], kernel_type=kernel_type,
                                                  **featkwargs) for i in range(0, n2, granularity))
         kernel = (np.vstack(kernel))
     else: # used as verification

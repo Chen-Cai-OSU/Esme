@@ -8,6 +8,7 @@ from Esme.dgms.format import print_dgm
 from Esme.dgms.kernel import sw_parallel
 from Esme.graph.dataset.tu_dataset import load_tugraphs
 from Esme.ml.svm import classifier
+from Esme.helper.parser import combine_dgms
 
 matplotlib.use('tkagg')
 import matplotlib.pyplot as plt
@@ -61,8 +62,8 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 parser = ArgumentParser("scoring", formatter_class=ArgumentDefaultsHelpFormatter, conflict_handler='resolve')
 parser.add_argument("--graph", default='imdb_binary', type=str, help='graph')
 parser.add_argument("--fil", default='deg', type=str, help='graph')
-parser.add_argument('--s1', default=42, type=int, help='viz two fake dgms')
-parser.add_argument('--s2', default=41, type=int, help='viz two fake dgms')
+parser.add_argument('--s1', default=42, type=int, help='random seed')
+parser.add_argument('--s2', default=41, type=int, help='random seed2')
 parser.add_argument('--doublefake', action='store_true', help='viz two fake dgms')
 parser.add_argument('--viz', action='store_true', help='viz or not')
 
@@ -71,18 +72,29 @@ if __name__ == '__main__':
     args = parser.parse_args()
     graph = args.graph
     norm = True
-    seed_flag = False
+    # seed_flag = True # bad. Even double fake has good accuracy.
+    seed_flag = True
     fil = args.fil
     gs, labels = load_tugraphs(graph)
     subdgms = gs2dgms_parallel(gs, fil=fil, fil_d='sub', norm=norm, graph = graph, ntda = False, debug_flag = False)
     supdgms = gs2dgms_parallel(gs, fil=fil, fil_d='sup', norm=norm, graph = graph, ntda = False, debug_flag = False)
     epddgms = gs2dgms_parallel(gs, fil=fil, one_hom=True, norm=norm, graph = graph, ntda = False, debug_flag = False)
-    from Esme.helper.parser import combine_dgms
     dgms = combine_dgms(subdgms, supdgms, epddgms, ss=True, epd=False, flip=False)
 
     true_dgms = dgms
-    fake_dgms = permute_dgms(true_dgms, permute_flag=True, seed=args.s1, seed_flag=seed_flag)
-    another_fake_dgms = permute_dgms(true_dgms, permute_flag=True, seed=args.s2, seed_flag=seed_flag)
+    if False:
+        fake_dgms = permute_dgms(true_dgms, permute_flag=True, seed=np.random.randint(10000), seed_flag=seed_flag)
+        # sanity_dgms = permute_dgms(true_dgms, permute_flag=True, seed=args.s1, seed_flag=seed_flag)
+        another_fake_dgms = permute_dgms(true_dgms, permute_flag=True, seed=np.random.randint(10000), seed_flag=seed_flag)
+    else:
+        fake_dgms = permute_dgms(true_dgms, permute_flag=True, seed=args.s1, seed_flag=seed_flag)
+        # sanity_dgms = permute_dgms(true_dgms, permute_flag=True, seed=args.s1, seed_flag=seed_flag)
+        another_fake_dgms = permute_dgms(true_dgms, permute_flag=True, seed=args.s2, seed_flag=seed_flag)
+
+    print(f'one fake dgm is {print_dgm(fake_dgms[10])} \n')
+    # print(f'sanity dgm is {print_dgm(sanity_dgms[10])} \n')
+    print(f'another fake dgm is {print_dgm(another_fake_dgms[10])} \n')
+
     all_dgms = true_dgms + fake_dgms
     indicator_labels = [1] * len(true_dgms) + [-1] * len(fake_dgms)
 
@@ -94,6 +106,8 @@ if __name__ == '__main__':
     # classify true diagrams from fake ones
     feat_kwargs = {'n_directions': 10, 'bw':1}
     k, _ = sw_parallel(all_dgms, all_dgms, parallel_flag=True, kernel_type='sw', **feat_kwargs)
+
+
     print(k.shape)
     cmargs = {'print_flag': 'off'} # confusion matrix
     clf = classifier(indicator_labels, indicator_labels, method='svm', n_cv=1, kernel=k, **cmargs)
@@ -110,5 +124,4 @@ if __name__ == '__main__':
 
     fake_labels = [-label for label in labels]
     viz_distm(kdist, mode='tsne', y= indicator_labels)
-    # viz_distm(kdist, mode='tsne', y= labels + fake_labels)
 

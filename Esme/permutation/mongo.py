@@ -9,8 +9,8 @@ from Esme.permutation.mongo_util import permute
 from Esme.helper.time import timefunction
 from Esme.graph.dataset.stoa import perslay
 
-ID_THRESHOLD = 560
-# ID_THRESHOLD = 9000
+ID_THRESHOLD =  560 # used for most of the time
+# ID_THRESHOLD = 10000 # test how much speed for for the query
 PERMUTE = False
 FLIP = False
 FEAT = 'sw'
@@ -22,7 +22,6 @@ def probe_db():
     query = f'permute == {PERMUTE} and flip == {FLIP} and _id >={ID_THRESHOLD} and graph=="{graph}"'
     df = sacred_to_df(db.runs).query(query)
     print(df.to_string())
-
 
 def permute_table(db, latex_f = False):
     """
@@ -74,14 +73,20 @@ def examine_one_graph(db, graph='mutag', latex_f = False, n_cv = 1, print_flag =
     df_.feat = 'sw_p' # df_.rename(columns={'feat': 'population'}, inplace=True)
     df = pd.concat([df, df_])
 
+    # add pf with permutation as False
+    query = f'n_cv=={n_cv} and permute == False and flip == {FLIP} and _id >={ID_THRESHOLD} and graph=="{graph}" and feat=="pf" and ntda!=True'
+    df_ = sacred_to_df(db.runs).query(query)
+    df_.feat = 'pf'
+    df = pd.concat([df, df_])
+
     # add filvec
     query = f'n_cv=={n_cv} and permute == {PERMUTE} and flip == {FLIP} and _id >={ID_THRESHOLD} and graph=="{graph}" and feat=="pervec" and ntda==True'
     df_ = sacred_to_df(db.runs).query(query)
     df_.feat = 'filvec'  # df_.rename(columns={'feat': 'population'}, inplace=True)
     df = pd.concat([df, df_])
-    allowed_feats = ['pervec', 'sw', 'sw_p', 'filvec']
+    allowed_feats = ['pervec', 'sw', 'sw_p', 'filvec', 'pf']
 
-    if True: # turned on sometimes
+    if False: # turned on sometimes
         query = f'permute == True and flip == {FLIP} and _id >={ID_THRESHOLD} and graph=="{graph}" and feat=="pss"'
         df_ = sacred_to_df(db.runs).query(query)
         df_.feat = 'pss_p'  # df_.rename(columns={'feat': 'population'}, inplace=True)
@@ -93,7 +98,7 @@ def examine_one_graph(db, graph='mutag', latex_f = False, n_cv = 1, print_flag =
         df = pd.concat([df, df_])
 
         # filter out pervector and pss
-        allowed_feats = ['pervec', 'sw', 'sw_p', 'pss', 'pss_p', 'wg', 'wg_p']
+        allowed_feats = ['pervec', 'sw', 'sw_p', 'pss', 'pss_p', 'wg', 'wg_p', 'pf']
         df = df[df.feat.isin(allowed_feats)]
 
     df = df[df.feat.isin(allowed_feats)]
@@ -108,6 +113,7 @@ def examine_one_graph(db, graph='mutag', latex_f = False, n_cv = 1, print_flag =
 
     df = df_format(df)
     df['mean'] = df.mean(axis=1) # add mean column
+    df.round({'mean': 2})
 
     caption = f'Here is the summary of different feats for graph {graph} with n_cv {n_cv}\n' + query
     print(caption)
@@ -151,6 +157,13 @@ parser.add_argument("--n_entry", default=20, type=int, help='number recent entri
 if __name__ == '__main__':
     db = get_tda_db()
     args = parser.parse_args()
+
+    # test the pf query
+    query = f'n_cv=={1} and permute == False and flip == {FLIP} and _id >={ID_THRESHOLD} and graph=="{"protein_data"}" and feat=="pf" and ntda!=True'
+    df_ = sacred_to_df(db.runs).query(query)
+    print(df_)
+    # sys.exit()
+
     # look at imdb wired case
     if False:
         query = '_id>5000 and graph == "imdb_binary" and feat=="pervec" and fil=="random"'
@@ -159,20 +172,20 @@ if __name__ == '__main__':
         sys.exit()
 
     # coarse grain
-    query = '_id>=2100 and graph!="dfhr," ' # status=="FAILED" and
+    query = '_id>=2100 and graph!="dfhr," and status=="COMPLETED" ' # status=="FAILED" and
     df_summary = sacred_to_df(db.runs).query(query)
     print(df_summary.tail(args.n_entry))
-    sys.exit()
+    # sys.exit()
     # examine_one_graph(db, 'reddit_binary', latex_f=True, print_flag=False)
     # sys.exit()
 
     # examine one graph (aggregation results)
     dfs = []
-    graph_names = ['collab','protein_data', 'nci1'] # ['cox2',  'dfhr', 'imdb_binary', 'imdb_multi', 'dd_test' ] # ['cox2'  'dfhr' 'imdb_binary' 'imdb_multi' 'dd_test' ] # ['bzr', 'cox2', 'dd_test', 'dhfr', 'frankenstein', 'imdb_binary', 'imdb_multi', 'nci1', 'protein_data', 'ptc', 'reddit_5K'] # ['dhfr', 'frankenstein', 'cox2' ]
+    graph_names = ['protein_data','bzr','cox2', 'dd_test', 'dfhr', 'frankenstein', 'imdb_binary', 'imdb_multi', 'nci1', 'protein_data', 'reddit_binary'] # ['protein_data', 'imdb_binary'] # # ['mutag'] # ['collab','protein_data', 'nci1'] #  # ['cox2'  'dfhr' 'imdb_binary' 'imdb_multi' 'dd_test' ] # ['bzr', 'cox2', 'dd_test', 'dhfr', 'frankenstein', 'imdb_binary', 'imdb_multi', 'nci1', 'protein_data', 'ptc', 'reddit_5K'] # ['dhfr', 'frankenstein', 'cox2' ]
     for graph in graph_names:
         # graph = 'protein_data'
         # _ = examine_one_graph(db, graph, latex_f=False, n_cv=10)
-        individual_df = examine_one_graph(db, graph, n_cv=1, latex_f=False)
+        individual_df = examine_one_graph(db, graph, n_cv=1, latex_f=False) # todo change n_cv back to 1
         dfs.append(individual_df)
     sys.exit()
 

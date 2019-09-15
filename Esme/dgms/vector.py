@@ -65,10 +65,8 @@ class pipl():
 
         if self.vec_type == 'pi':
             if True:
-                diagsT = DiagramPreprocessor(use=True, scalers=[([0, 1], BirthPersistenceTransform())]).fit_transform(
-                    self.diags)
-                PI = PersistenceImage(bandwidth=1., weight=lambda x: x[1], im_range=[0, 10, 0, 10],
-                                      resolution=[100, 100])
+                diagsT = DiagramPreprocessor(use=True, scalers=[([0, 1], BirthPersistenceTransform())]).fit_transform(self.diags)
+                PI = PersistenceImage(bandwidth=1., weight=lambda x: x[1], im_range=[0, 10, 0, 10], resolution=[100, 100])
                 res = PI.fit_transform(diagsT)
 
             if False:
@@ -89,21 +87,21 @@ class pipl():
                 res = PI.fit_transform(diagsT)
 
         elif self.vec_type == 'pl':
-            kwargs = filterdict(kwargs, ['num_landscapes', 'resolution'])
-            LS = tda.Landscape(**kwargs)
+            kwargs_ = filterdict(kwargs, ['num_landscapes', 'resolution'])
+            LS = tda.Landscape(**kwargs_)
             # LS = tda.Landscape(num_landscapes=5, resolution=100)
-            print('self.diags', self.diags[1], self.diags[2])
-            diags = [np.array(diag) for diag in self.diags]
-            D = np.array([[0., 4.], [1., 2.], [3., 8.], [6., 8.]])
+            # print('self.diags', self.diags[1], self.diags[2])
+            # diags = [np.array(diag) for diag in self.diags]
+            # D = np.array([[0., 4.], [1., 2.], [3., 8.], [6., 8.]])
 
-            res = LS.fit_transform([D, D])
+            # res = LS.fit_transform([D, D])
 
             # matheiu's implementation
-            LS = Landscape(resolution=1000)
-            D = np.array([[0., 4.], [1., 2.], [3., 8.], [6., 8.]])
-            diags = [D]
+            # LS = Landscape(resolution=1000)
+            # D = np.array([[0., 4.], [1., 2.], [3., 8.], [6., 8.]])
+            # diags = [D]
 
-            L = LS.fit_transform(diags)
+            res = LS.fit_transform(self.diags)
 
 
         elif self.vec_type == 'pervec': # permutation vector, i.e. the historgram of coordinates of dgm
@@ -121,7 +119,8 @@ class pipl():
         t2 = time.time()
         t = precision_format((t2 - t1), 1)
         self.t = t
-
+        if kwargs.get('keep_zero', None) == True:
+            return normalize_(res, axis=self.axis)
         return rm_zerocol(normalize_(res, axis=self.axis), cor_flag=False)
 
     def summary(self):
@@ -312,7 +311,7 @@ def dgm_statfeat(dgm):
     return feat
 
 if __name__ == '__main__':
-    dgm = d.Diagram([(.2,.3), (.3,.4)])
+    dgm = d.Diagram([(.2,.3), (.3,.4), (.5, .6)])
     dgms = [dgm] * 10
     labels = np.array([1, -1]*50)
 
@@ -320,8 +319,9 @@ if __name__ == '__main__':
     params = {'num_landscapes': 5, 'resolution': 100}
     landscape = dgms2vec(dgms, vectype='pl', **params)
     landscapes = merge_dgms(dgms, dgms, dgms, vectype='pl', **params)
-    print (np.shape(landscape), np.shape(landscapes))
+    print(np.shape(landscape), np.shape(landscapes))
     sys.exit()
+
     # todo pi has some problem
     params = {'bandwidth': 1.0, 'weight': (1, 1), 'im_range': [0, 1, 0, 1], 'resolution': [5, 5]}
     image = dgms2vec(dgms, vectype='pi', **params)

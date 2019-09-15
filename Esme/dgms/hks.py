@@ -12,7 +12,7 @@ import time
 @timefunction
 def hks(g, t):
     t0 = time.time()
-    lap = normalized_laplacian_matrix(g).toarray()
+    lap = normalized_laplacian_matrix(g, weight='weight').toarray()
     w, v = LA.eig(lap) # eigvalue, eigvector
     hks = 0
     for i in range(len(w)):

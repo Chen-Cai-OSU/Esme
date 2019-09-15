@@ -10,6 +10,27 @@ from Esme.helper.load_graph import component_graphs
 from Esme.helper.time import timefunction
 import torch
 from torch_geometric.utils import to_undirected
+from sklearn.neighbors import kneighbors_graph
+from networkx.linalg.laplacianmatrix import normalized_laplacian_matrix
+from Esme.helper.time import timefunction
+from Esme.viz.pointcloud import plot3dpts
+
+def modelnet_cat():
+    # convert y from pytorch_geometric to labels
+    dict = {
+     0: 'bathtub',
+     1: 'bed',
+     2: 'chair',
+     3: 'desk',
+     4: 'dresser',
+     5: 'monitor',
+     6: 'night_stand',
+     7: 'sofa',
+     8: 'table',
+     9: 'toilet'}
+
+    count = {0: 156, 1: 615, 2: 989, 3: 286, 4: 286, 5: 565, 6: 286, 7: 780, 8: 492, 9: 444}
+    return dict
 
 @timefunction
 def torch_geometric_2nx(dataset, labels_only = False, print_flag = False, weight_flag = False):
@@ -72,8 +93,6 @@ def torch_geometric_2nx(dataset, labels_only = False, print_flag = False, weight
         if print_flag: print(i)
     return graphs, labels
 
-from Esme.helper.time import timefunction
-
 def load_modelnet(version='10', point_flag = False):
     """
     :param point_flag: Sample points if point_flag true. Otherwise load mesh
@@ -81,7 +100,7 @@ def load_modelnet(version='10', point_flag = False):
     """
     assert version in ['10', '40']
     if point_flag:
-        pre_transform, transform = T.NormalizeScale(), T.SamplePoints(2048)
+        pre_transform, transform = T.NormalizeScale(), T.SamplePoints(1024)
     else:
         pre_transform, transform = FaceToEdge(), None
 
@@ -91,6 +110,40 @@ def load_modelnet(version='10', point_flag = False):
     train_dataset = ModelNet(path, version, True, transform=transform, pre_transform=pre_transform)
     test_dataset = ModelNet(path, version, False, transform=transform, pre_transform=pre_transform)
     return train_dataset, test_dataset
+
+@timefunction
+def modelnet2pts2gs(version='10', nbr_size = 8, exp_flag = True, label_only = False, a=None, b=None):
+    """ sample points and create neighborhoold graph
+    """
+
+    train_dataset, test_dataset = load_modelnet(version=version, point_flag=True)
+    all_dataset = train_dataset + test_dataset
+    labels = [int(data.y) for data in all_dataset]
+    n = len(all_dataset)
+    if label_only: return None, labels
+
+    if a is not None and b is not None:
+        search_range = range(a,b)
+    else:
+        search_range = range(n)
+
+    gs = []
+    for i in search_range:
+        pos = all_dataset[i].pos.numpy() # (1024, 3)
+        adj = kneighbors_graph(pos, nbr_size, mode='distance', n_jobs=-1)
+        g = nx.from_scipy_sparse_matrix(adj, edge_attribute= 'weight')
+        if exp_flag:
+            for u, v in g.edges():
+                g[u][v]['weight'] = np.exp(-g[u][v]['weight'])
+        if i % 10==0: print(f'finish converting {i}')
+        gs.append(g)
+    return gs, labels
+
+    # lap = normalized_laplacian_matrix(g, weight='w').toarray()
+    # np.set_printoptions(threshold=np.nan)
+    # print(lap)
+    # print(lap[1,:])
+    # print(g[1023])
 
 @timefunction
 def modelnet2graphs(version = '10', print_flag = False, labels_only = False, a = 0, b = 10, weight_flag = False):
@@ -124,7 +177,6 @@ def modelnet2points(version, idx = 1):
     print(train_dataset[1]) # Data(pos=[1024, 3], y=[1])
 
     x = train_dataset[idx].pos.numpy()
-    from Esme.viz.pointcloud import plot3dpts
     plot3dpts(x)
 
 
@@ -139,6 +191,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     idx = args.idx
     version = '10'
+    gs = modelnet2pts2gs(version, exp_flag=True, a = 1, b = 20)
+
+    sys.exit()
+
     train_dataset, test_dataset = load_modelnet(version, point_flag=False)
     print(len(test_dataset[idx].pos))
 
@@ -169,9 +225,6 @@ if __name__ == '__main__':
     from Esme.viz.pointcloud import plot_example
     plot_example(face=face, pos=pos)
     sys.exit()
-
-
-
 
 
     args = parser.parse_args()

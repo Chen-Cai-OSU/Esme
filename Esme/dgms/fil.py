@@ -21,7 +21,7 @@ from Esme.helper.load_graph import load_graphs
 from Esme.helper.time import timefunction, time_node_fil
 from Esme.dgms.fake import array2dgm
 from Esme.dgms.ioio import dgms_dir_test, load_dgms, save_dgms
-from Esme.graph.dataset.modelnet import modelnet2graphs
+from Esme.graph.dataset.modelnet import modelnet2graphs, modelnet2pts2gs
 from Esme.dgms.format import export_dgm
 from Esme.helper.dgms import check_single_dgm
 import os
@@ -399,6 +399,9 @@ def nodefeat(g, fil, norm = False, **kwargs):
     elif fil == 'cc':
         nodefeat = np.array(list(nx.closeness_centrality(g).values()))
         nodefeat = nodefeat.reshape(len(g), 1)
+    elif fil == 'cc_w':
+        nodefeat = np.array(list(nx.closeness_centrality(g, distance='dist').values()))
+        nodefeat = nodefeat.reshape(len(g), 1)
     elif fil == 'random':
         nodefeat = np.random.random((len(g), 1))
     elif fil == 'hop':
@@ -434,6 +437,11 @@ def nodefeat(g, fil, norm = False, **kwargs):
             print('after true fiedler')
             nodefeat = nodefeat.reshape(len(g), 1)
 
+    elif fil == 'fiedler_s':
+        nodefeat = fiedler_vector(g, normalized=False)  # np.ndarray
+        nodefeat = nodefeat.reshape(len(g), 1)
+        nodefeat = np.multiply(nodefeat, nodefeat)
+
 
     elif fil == 'ricci':
         try:
@@ -448,6 +456,18 @@ def nodefeat(g, fil, norm = False, **kwargs):
         t = float(fil[4:])
         from Esme.dgms.hks import hks
         nodefeat = hks(g, t)
+
+
+    elif fil == 'ricci_w':
+        try:
+            g = ricciCurvature(g, alpha=0.5, weight='dist')
+            ricci_dict = nx.get_node_attributes(g, 'ricciCurvature')
+            ricci_list = [ricci_dict[i] for i in range(len(g))]
+            nodefeat = np.array(ricci_list).reshape((len(g), 1))
+        except:
+            nodefeat = np.random.random(
+                (len(g), 1))  # cvxpy.error.SolverError: Solver 'ECOS' failed. Try another solver.
+
     else:
         raise Exception('No such filtration: %s'%fil)
     assert nodefeat.shape == (len(g), 1)
@@ -562,10 +582,9 @@ def g2dgm(i, g=None, fil='deg', fil_d = 'sub', norm=False, one_hom=False, debug_
         i += kwargs.get('a', 0)
         print(f'processing {i}-th graph({len(g)}/{len(g.edges)}) where fil is {fil} and fil_d is {fil_d} and one_hom is {one_hom}')
 
-    if kwargs['write'] == True:  # 一个后门
+    if kwargs.get('write', None) == True:  # 一个后门
         fil_d_ = 'epd' if one_hom == True else  fil_d
-        if check_single_dgm(graph = 'mn'+version, fil = fil, fil_d=fil_d_, norm=norm, idx=i): return
-
+        # if check_single_dgm(graph = 'mn'+version, fil = fil, fil_d=fil_d_, norm=norm, idx=i): return
 
     components = component_graphs(g)
     dgm = d.Diagram([])
@@ -580,10 +599,11 @@ def g2dgm(i, g=None, fil='deg', fil_d = 'sub', norm=False, one_hom=False, debug_
         dgm = dgm_filter(dgm)
     dgm = dgm_filter(dgm) # handle the case when comonents is empty
 
-    if kwargs['write'] == True: # 一个后门
+    if kwargs.get('write', None) == True: # 一个后门
         if one_hom == True: fil_d = 'epd'
-        dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/', 'mn' + version, fil, fil_d,'norm_' + str(norm), '')
-        export_dgm(dgm, dir=dir, filename=  str(i) +'.csv', print_flag=True)
+        fil_save = fil + '_nbr' + str(args.nbr_size) + '_exp' + str(args.exp)
+        dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/', 'mn' + version, fil_save, fil_d,'norm_' + str(norm), '')
+        export_dgm(dgm, dir=dir, filename= str(i) +'.csv', print_flag=True)
     return dgm
 
 
@@ -603,7 +623,7 @@ def gs2dgms_parallel(n_jobs = 1, **kwargs):
 
     try:
         # print('in gs2dgms_parallel', kwargs)
-        dgms = Parallel(n_jobs=n_jobs)(delayed(g2dgm)(i, gs[i], **kwargs) for i in range(len(gs)))
+        dgms = Parallel(n_jobs=n_jobs, backend='multiprocessing')(delayed(g2dgm)(i, gs[i], **kwargs) for i in range(len(gs)))
     except NameError:  # name gs is not defined
         sys.exit('NameError and exit')
 
@@ -621,7 +641,7 @@ def _gs2dgms_parallel(n_jobs = 1, **kwargs):
         print(globals().keys())
 
     try:
-        dgms = Parallel(n_jobs=n_jobs)(delayed(g2dgm)(i, gs[i], **kwargs) for i in range(len(gs)))
+        dgms = Parallel(n_jobs=n_jobs, backend='multiprocessing')(delayed(g2dgm)(i, gs[i], **kwargs) for i in range(len(gs)))
     except NameError:  # name gs is not defined
         print('NameError and exit')
         sys.exit()
@@ -678,90 +698,105 @@ parser.add_argument("--a", default=0, type=int, help='write files in batch. a is
 parser.add_argument("--b", default=100, type=int, help='write files in batch. b is ender')
 parser.add_argument("--n_jobs", default=1, type=int, help='n_jobs')
 parser.add_argument("--step_size", default=1, type=int, help='step size for sampling')
+parser.add_argument("--nbr_size", default=8, type=int, help='nbr graph size')
+
 
 parser.add_argument("--parallel", action='store_true', help='use parallel or not')
 parser.add_argument("--sub", action='store_true', help='compute sub only')
 parser.add_argument("--sup", action='store_true', help='compute sup only')
 parser.add_argument("--epd", action='store_true', help='compute epd only')
-parser.add_argument("--all", action='store_true', help='compute epd only')
+parser.add_argument("--all", action='store_true', help='compute all dgms')
+parser.add_argument("--exp", action='store_true', help='use the exp or dist')
+
 
 if __name__ == '__main__':
     # g = nx.random_geometric_graph(100, 0.3)
     # nodefeat = edgefeat(g, fil='ricci', agg='min', norm=False)
     # print(nodefeat.shape)
-
     # compute for graphs that are larger than memory
+
+    # computing the dgms for modelnet
     args = parser.parse_args()
-    version = '10'
+
+    # modelnet
+    version = '40'
     a, b, n_jobs = args.a, args.b, args.n_jobs
-    fil = 'fiedler_w' # 'fiedler'
+    fil = 'hks_1'  # 'fiedler'
 
-    kw = {'a':a, 'b':b, 'fil': fil}
-    if check_partial_dgms(**kw, fil_d='sub') and check_partial_dgms(**kw, fil_d='sup') and check_partial_dgms(**kw, fil_d='epd') : sys.exit()
+    kw = {'a': a, 'b': b, 'fil': fil}
+    # if check_partial_dgms(**kw, fil_d='sub') and check_partial_dgms(**kw, fil_d='sup') and check_partial_dgms(**kw, fil_d='epd'): sys.exit()
 
-    gs, labels = modelnet2graphs(version=version, print_flag=True, a = a, b = b, weight_flag=True) # todo weight_flag is false for fiedler
+    # gs, labels = modelnet2graphs(version=version, print_flag=True, a=a, b=b, weight_flag=True)  # todo weight_flag is false for fiedler
+    gs, labels = modelnet2pts2gs(version=version, a=a, b=b, nbr_size=args.nbr_size, exp_flag=args.exp)
+    print(len(gs), len(labels))
     norm, ntda = True, False
 
-    for fil in [fil]: # ['hks_1']: #['hks_1', 'hks_10', 'hks_0.1']:
+    for fil in ['cc_w']: #['fiedler_s' ,'hks_0.1', 'hks_1', 'hks_10', 'hks_100']: # ['hks_1', 'hks_10', 'hks_0.1', 'fiedler_w']:  # ['hks_1']: #['hks_1', 'hks_10', 'hks_0.1']:
 
         if args.parallel:
-            kwargs = {'fil': fil, 'fil_d': 'sub', 'norm': norm, 'graph': 'mn' + version, 'ntda': ntda, 'debug_flag': True}
+            kwargs = {'fil': fil, 'fil_d': 'sub', 'norm': norm, 'graph': 'mn' + version, 'ntda': ntda, 'debug_flag': True} # dgm = g2dgm(i, gs[i], **kwargs) for debug
 
-            kwargs['write'] = True # for testing the new way for parallem computing
+            kwargs['write'] = True
             kwargs['a'] = a
+            kwargs['nbr'] = args.nbr_size
 
             if args.sub or args.all:
-                subdgms = Parallel(n_jobs=n_jobs, backend='multiprocessing')(delayed(g2dgm)(i, gs[i], **kwargs) for i in range(0, len(gs),args.step_size))
+                subdgms = Parallel(n_jobs=n_jobs, backend='multiprocessing')(delayed(g2dgm)(i, gs[i], **kwargs) for i in range(0, len(gs), args.step_size))
                 del subdgms
 
             if args.sup or args.all:
                 kwargs['fil_d'] = 'sup'
-                supdgms = Parallel(n_jobs=n_jobs, backend='multiprocessing')(delayed(g2dgm)(i, gs[i], **kwargs) for i in range(0, len(gs),args.step_size))
+                supdgms = Parallel(n_jobs=n_jobs, backend='multiprocessing')(delayed(g2dgm)(i, gs[i], **kwargs) for i in range(0, len(gs), args.step_size))
                 del supdgms
 
             if args.epd or args.all:
                 kwargs['one_hom'] = True
-                epddgms = Parallel(n_jobs=n_jobs, backend='multiprocessing')(delayed(g2dgm)(i, gs[i], **kwargs) for i in range(0, len(gs),args.step_size))
+                epddgms = Parallel(n_jobs=n_jobs, backend='multiprocessing')(delayed(g2dgm)(i, gs[i], **kwargs) for i in range(0, len(gs), args.step_size))
                 del epddgms
 
         else:
-            # subdgms = gs2dgms(gs, n_jobs=n_jobs, fil=fil, fil_d='sub', norm=norm, graph = 'mn' + version, ntda = ntda, debug_flag = True)
-            supdgms = gs2dgms(gs, n_jobs=n_jobs, fil=fil, fil_d='sup', norm=norm, graph='mn' + version, ntda=ntda, debug_flag=True)
-            # epddgms = gs2dgms(gs, fil=fil, one_hom=True, norm=norm, graph='mn' + version, ntda=ntda, debug_flag=True, n_jobs=n_jobs)
+            subdgms = gs2dgms(gs, n_jobs=n_jobs, fil=fil, fil_d='sub', norm=norm, graph = 'mn' + version, ntda = ntda, debug_flag = True)
+            supdgms = gs2dgms(gs, n_jobs=n_jobs, fil=fil, fil_d='sup', norm=norm, graph='mn' + version, ntda=ntda,
+                              debug_flag=True)
+            epddgms = gs2dgms(gs, fil=fil, one_hom=True, norm=norm, graph='mn' + version, ntda=ntda, debug_flag=True, n_jobs=n_jobs)
 
         continue
-        for i in range(a,b):
-            dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/mn10/', fil, 'sub/norm_True/' )
-            export_dgm(subdgms[i-a], dir=dir, filename= str(i) +'.csv')
+        for i in range(a, b):
+            dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/mn10/', fil,
+                               'sub/norm_True/')
+            export_dgm(subdgms[i - a], dir=dir, filename=str(i) + '.csv')
 
-            dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/mn10/', fil, 'sup/norm_True/')
+            dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/mn10/', fil,
+                               'sup/norm_True/')
             export_dgm(supdgms[i - a], dir=dir, filename=str(i) + '.csv')
 
-            dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/mn10/', fil, 'epd/norm_True/')
+            dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/mn10/', fil,
+                               'epd/norm_True/')
             export_dgm(epddgms[i - a], dir=dir, filename=str(i) + '.csv')
 
     sys.exit()
 
-
-
     # computing dgms for replicate.py
-    graph = 'cox2'
-    for graph in  ['bzr', 'cox2', 'dhfr', 'dd_test', 'nci1',  'frankenstein', 'protein_data',   'imdb_binary',  'imdb_multi', 'reddit_binary', 'reddit_5K']:
+    for graph in  ['bzr', 'cox2', 'dhfr', 'dd_test', 'nci1', 'frankenstein', 'protein_data', 'imdb_binary', 'imdb_multi', 'reddit_binary', 'reddit_5K']:
         from Esme.graph.dataset.tu_dataset import load_tugraphs, load_shapegraphs
         from Esme.graph.dataset.modelnet import modelnet2graphs
+
         gs, labels = load_tugraphs(graph)
         # gs, labels = modelnet2graphs(version='10', print_flag=True, test_size=None) # load_shapegraphs(graph)
-        norm = True # todo: change to True
-        for fil in ['hks_1', 'hks_10', 'hks_0.1']: # ['deg', 'random', 'cc', 'fiedler', 'ricci']:
+        norm = True  # todo: change to True
+        for fil in  ['hks_100', 'fiedler_s']: #['deg', 'random', 'cc', 'fiedler', 'ricci']:  # ['hks_1', 'hks_10', 'hks_0.1']:
             n_jobs = 1
             for ntda in [False]:
                 # subdgms = gs2dgms(gs=gs, n_jobs=n_jobs, fil=fil, fil_d='sub', norm=norm, graph = graph, ntda = ntda, debug_flag = True)
                 # supdgms = gs2dgms(gs=gs, n_jobs=n_jobs, fil=fil, fil_d='sup', norm=norm, graph = graph, ntda = ntda, debug_flag = True)
                 # epddgms = gs2dgms(gs=gs, n_jobs=n_jobs, fil=fil, one_hom=True, norm=norm, graph = graph, ntda = ntda, debug_flag = True)
 
-                subdgms = gs2dgms_parallel(n_jobs=n_jobs, fil=fil, fil_d='sub', norm=norm, graph = graph, ntda = ntda, debug_flag = True)
-                supdgms = gs2dgms_parallel(n_jobs=n_jobs, fil=fil, fil_d='sup', norm=norm, graph = graph, ntda = ntda, debug_flag = True)
-                epddgms = gs2dgms_parallel(n_jobs=n_jobs, fil=fil, one_hom=True, norm=norm, graph = graph, ntda = ntda, debug_flag = True)
+                subdgms = gs2dgms_parallel(n_jobs=n_jobs, fil=fil, fil_d='sub', norm=norm, graph=graph, ntda=ntda,
+                                           debug_flag=True)
+                supdgms = gs2dgms_parallel(n_jobs=n_jobs, fil=fil, fil_d='sup', norm=norm, graph=graph, ntda=ntda,
+                                           debug_flag=True)
+                epddgms = gs2dgms_parallel(n_jobs=n_jobs, fil=fil, one_hom=True, norm=norm, graph=graph, ntda=ntda,
+                                           debug_flag=True)
         continue
         for fil in ['deg', 'random', 'ricci', 'cc', 'fiedler']:
             for ntda in [True]:
@@ -769,7 +804,15 @@ if __name__ == '__main__':
                 supdgms = gs2dgms_parallel(n_jobs=-1, fil=fil, fil_d='sup', norm=norm, graph=graph, ntda=ntda)
                 epddgms = gs2dgms_parallel(n_jobs=-1, fil=fil, one_hom=True, norm=norm, graph=graph, ntda=ntda)
 
+
     sys.exit()
+
+
+    sys.exit()
+
+
+
+
 
     save_dgms(subdgms, **kwargs)
     dgms_summary(subdgms)

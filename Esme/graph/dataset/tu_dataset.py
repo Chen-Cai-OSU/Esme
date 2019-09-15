@@ -183,7 +183,7 @@ def load_shapegraphs(graph = 'mn10'):
 def name_conversion(graph='mutag'):
 
     # change mutag to MUTAG. reddit_5K to REDDIT-MULTI-5K
-    if graph in ['mutag', 'nci1', 'nci109', 'collab', 'cox2', 'dhfr', 'frankenstein','bzr']:
+    if graph in ['mutag', 'nci1', 'nci109', 'collab', 'cox2', 'dhfr', 'frankenstein','bzr', 'enzymes']:
         return graph.upper()
     elif graph == 'reddit_5K':
         return 'REDDIT-MULTI-5K'

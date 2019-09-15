@@ -109,7 +109,7 @@ def main(graph, fil, norm, permute, ss, epd, n_cv, flip, feat, feat_kwargs, ntda
     epddgms = gs2dgms_parallel(n_jobs=-1, fil=fil, one_hom=True, norm=norm, graph = graph, ntda = ntda)
 
     dgms = combine_dgms(subdgms, supdgms, epddgms, ss=ss, epd=epd, flip=flip)
-    dgms = permute_dgms(dgms, permute_flag=permute)
+    dgms = permute_dgms(dgms, permute_flag=permute) # old way
     dgms_summary(dgms)
 
     swdgms = dgms2swdgms(dgms)
@@ -117,7 +117,7 @@ def main(graph, fil, norm, permute, ss, epd, n_cv, flip, feat, feat_kwargs, ntda
         print(feat_kwargs)
         k, _ = sw_parallel(swdgms, swdgms, parallel_flag=True, kernel_type='sw', **feat_kwargs)
         print(k.shape)
-        cmargs = {'print_flag': 'on'} # confusion matrix
+        cmargs = {'print_flag': 'off'} # confusion matrix
         clf = classifier(labels, labels, method='svm', n_cv=n_cv, kernel=k, **cmargs)
         clf.svm_kernel_(n_splits=10)
 

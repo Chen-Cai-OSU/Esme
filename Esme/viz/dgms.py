@@ -61,6 +61,17 @@ def viz_vector():
 
 
 if __name__ == '__main__':
+    graph = 'imdb_binary'  # 'reddit_binary'
+    norm = True
+    fil = 'ricci'
+    gs, labels = load_tugraphs(graph)
+    subdgms = gs2dgms_parallel(gs, fil=fil, fil_d='sub', norm=norm, graph=graph, ntda=False, debug_flag=False)
+    dgms = subdgms
+
+    swdgms = dgms2swdgms(dgms)
+    onedgm = np.vstack(swdgms)
+    density(onedgm)
+    sys.exit()
 
     # fake fake test
     graph = 'imdb_binary' # 'reddit_binary'
@@ -93,10 +104,3 @@ if __name__ == '__main__':
 
     sys.exit()
     viz_vector()
-    sys.exit()
-    data = np.random.multivariate_normal([0, 0], [[1, 0.5], [0.5, 3]], 200)
-    density(data)
-    dgms = randomdgms(10)
-    swdgms = dgms2swdgms(dgms)
-    onedgm = np.vstack(swdgms)
-    density(onedgm)
