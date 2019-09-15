@@ -13,21 +13,13 @@
 #     - dtype     One of ["int", "float"]. The datatype of the samples.
 
 
-bw:
+dim:
     format: "values"
     values:
-        - 0.01
         - 100
-        - 0.1
-        - 10
-        - 1
+        - 200
+        - 300
 
 
     dtype: "float"
-
-n_directions:
-    format: "values"
-    values:
-        - 10
-    dtype: "int"
 

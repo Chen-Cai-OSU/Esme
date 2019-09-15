@@ -12,22 +12,40 @@
 #                logarithmic scale.
 #     - dtype     One of ["int", "float"]. The datatype of the samples.
 
-
 bw:
     format: "values"
     values:
         - 0.01
-        - 100
         - 0.1
-        - 10
         - 1
-
-
     dtype: "float"
 
-n_directions:
+
+bwf:
     format: "values"
     values:
-        - 10
-    dtype: "int"
+        - 0.01
+        - 0.1
+        - 1
+    dtype: "float"
 
+#bw:
+#    format: "values"
+#    values:
+#        - 0.01
+#        - 0.1
+#        - 1
+#        - 10
+#        - 100
+#    dtype: "float"
+#
+#
+#bwf:
+#    format: "values"
+#    values:
+#        - 0.01
+#        - 0.1
+#        - 1
+#        - 10
+#        - 100
+#    dtype: "float"

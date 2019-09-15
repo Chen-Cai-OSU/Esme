@@ -274,6 +274,7 @@ class FKR_EigenPro(nn.Module):
 
     def tensor(self, x, dtype=None, release=False):
         t = torch.tensor(x, dtype=dtype, requires_grad=False).to(self.device)
+        # t = x.clone().detatch().require_grad(False)
         if release:
             self.pinned_list.append(t)
         return t
@@ -466,35 +467,48 @@ def init_train_Gaussian(s, x_train, y_train, x_test, y_test, epochs, n_class, me
     del model
     return 1 - res[epochs[-1]][1][1]  # validation classification error
 
-def eigenpro(x=None, y=None, rs=10, bd=1):
+def eigenpro(x=None, y=None, rs=10,  bd = 1, max_iter = 10, test_size = 0.1, **kwargs):
 
     """
     :param x: np.array of shape (n_data, dim)
     :param y: np.array of shape (n_data,)
     :param rs: random seed
-    :param bd: Gaussian kernel bandwidth
+    :param bd: Gaussian kernel bandwidth, default 1
+    :param test_size: test_size
     :return:
     """
-    # x, y = np.random.random(((70000, 784))), np.random.randint(0, 10, size=70000)
+
     n_class = len(np.unique(y))
     y = keras.utils.to_categorical(y, n_class)
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.1, random_state=rs)
-    x_train, y_train, x_test, y_test = x_train.astype('float32'), y_train.astype('float32'), x_test.astype(
-        'float32'), y_test.astype('float32')
+
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_size, random_state=rs)
+    if 'train_idx' in kwargs.keys():
+        train_idx = kwargs['train_idx'] # a list
+        n_data = x.shape[0]
+        test_idx = [i for i in range(n_data) if i not in train_idx]
+        x_train, y_train = x[train_idx,:], y[train_idx,:]
+        x_test, y_test = x[test_idx, :], y[test_idx, :]
+        print(f'x_train is {x_train.shape}, x_test is {x_test.shape}')
+        print(f'Use {len(train_idx)} for training...')
+
+    x_train, y_train, x_test, y_test = x_train.astype('float32'), y_train.astype('float32'), x_test.astype('float32'), y_test.astype('float32')
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    kernel = lambda x, y: Gaussian(x, y, s=1)
+    kernel = lambda x, y: Gaussian(x, y, s=bd)
     model = FKR_EigenPro(kernel, x_train, n_class, device=device)
-    res = model.fit(x_train, y_train, x_test, y_test, epochs=[1, 2, 5], mem_gb=12)
-    eval_f = lambda s: init_train_Gaussian(s, x_train[:10000], y_train[:10000], x_test, y_test, epochs=[10],
-                                           n_class=n_class, mem_gb=12, device=device)
+    epochs_ = list(range(1, max_iter+10, 10)) # [1, max_iter//5, max_iter//3, max_iter//2, max_iter]
+    res = model.fit(x_train, y_train, x_test, y_test, epochs=epochs_, mem_gb=12)
+    return res
+
+    # eval_f = lambda s: init_train_Gaussian(s, x_train[:10000], y_train[:10000], x_test, y_test, epochs=[10], n_class=n_class, mem_gb=12, device=device)
 
 if __name__ == '__main__':
 
-
-    eigenpro()
+    x, y = np.random.random(((70000, 784))), np.random.randint(0, 10, size=70000)
+    kwargs = {'train_idx': list(range(10000))}
+    eigenpro(x, y, **kwargs, max_iter=100)
     sys.exit()
 
     try:

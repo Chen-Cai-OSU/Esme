@@ -25,3 +25,5 @@ Sliced Wasserstein kernel, Persistence Scale Space kernel, Persistence Weighted 
 See Esme/examples. More examples will be added soon.
 ## Contact
 If you have any questions, feel free to contact me via cai.507@osu.edu or submit an issue on github.
+## Misc
+The name of Esme comes from a short [story]((https://en.wikipedia.org/wiki/For_Esm%C3%A9%E2%80%94with_Love_and_Squalor)) by J. D. Salinger. It recounts a sergeant's meeting with a young girl before being sent into combat in World War II.
