@@ -1,16 +1,22 @@
 import os
 import sys
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from collections import Counter
 
 import dionysus as d
 import numpy as np
+from joblib import Parallel, delayed
 
 from Esme.dgms.arithmetic import add_dgm
 from Esme.dgms.fake import permute_dgms
 from Esme.dgms.format import dgms2swdgms
 from Esme.dgms.format import load_dgm
 from Esme.dgms.kernel import sw_parallel
+from Esme.dgms.stats import normalize_
+from Esme.dgms.vector import dgms2vec
 from Esme.graph.dataset.modelnet import load_modelnet
+from Esme.graph.dataset.modelnet import modelnet2graphs
+from Esme.ml.eigenpro import eigenpro
 from Esme.ml.svm import classifier
 
 parser = ArgumentParser("scoring", formatter_class=ArgumentDefaultsHelpFormatter, conflict_handler='resolve')
@@ -30,6 +36,22 @@ parser.add_argument("--random", action='store_true')
 
 DIRECT = '/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/' # mn10/fiedler'
 
+def load_clfdgm(idx =1):
+    dgm = d.Diagram([[np.random.random(), 1]])
+    for fil_d in ['sub', 'sup', 'epd']:
+        dir = os.path.join(DIRECT, graph, fil, fil_d, 'norm_True', '')
+        f = dir + str(idx) + '.csv'
+
+        try:
+            tmp_dgm = load_dgm(dir, filename=f)
+        except FileNotFoundError:
+            print(f'{f} of size {all_dataset[i].pos.shape[0]}/{all_dataset[i].face.shape[1]} not found. Added a dummy one')
+            tmp_dgm = d.Diagram([[0, 0]])
+
+        dgm = add_dgm(dgm, tmp_dgm)
+    # print(f'finsih {idx}-th diagram')
+    return tmp_dgm
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -42,27 +64,18 @@ if __name__ == '__main__':
     all_dataset = train_dataset + test_dataset
     labels = [int(data.y) for data in all_dataset]
 
+    graph, fil = 'mn' + version, args.fil
+    n = len(labels)
     dgms = []
-    for i in range( args.idx):
-        graph, fil = 'mn' + version, args.fil
-        dgm = d.Diagram([[np.random.random(), 1]])
 
-        for fil_d in ['sub', 'sup', 'epd']:
-            dir = os.path.join(DIRECT, graph, fil, fil_d, 'norm_True','')
-            f = dir + str(i) + '.csv'
-            try:
-                tmp_dgm = load_dgm(dir, filename=f)
-            except FileNotFoundError:
-                print(f'{f} of size {all_dataset[i].pos.shape[0]}/{all_dataset[i].face.shape[1]} not found. Added a dummy one')
-                tmp_dgm = d.Diagram([[0,0]])
-            dgm = add_dgm(dgm, tmp_dgm)
-        dgms.append(dgm)
-
+    dgms = Parallel(n_jobs=-1, backend='multiprocessing')(delayed(load_clfdgm)(idx=i) for i in range(n))
+    print(f'len of dgms is {len(dgms)}')
     if args.permute: dgms = permute_dgms(dgms, permute_flag=True)
 
     if args.kernel == 'sw':
         swdgms = dgms2swdgms(dgms)
         feat_kwargs = {'n_directions': 10, 'bw': 1}
+        print(f'star computing kernel...')
         k, _ = sw_parallel(swdgms, swdgms, parallel_flag=True, kernel_type='sw', **feat_kwargs)
         print(k.shape)
 
@@ -72,21 +85,15 @@ if __name__ == '__main__':
         sys.exit()
 
     # convert to vector
-    x = dgms2vec(dgms, vectype='pvector')
-    if args.random:
-        x = np.random.random(x.shape)
-    if args.norm:
-        x = normalize(x, axis=0)
+    kwargs = {'num_landscapes': 5, 'resolution': 100, 'keep_zero': True}
+    x = dgms2vec(dgms, vectype='pl', **kwargs)
+    if args.random: x = np.random.random(x.shape)
+    if args.norm: x = normalize_(x, axis=0)
 
     _, y = modelnet2graphs(version=graph[-2:], print_flag=True, labels_only=True)
     print(f'total num is {len(y)}')
     y = np.array(y)[:args.idx]
     print(Counter(list(y)))
 
-    # classifer
-    if args.clf == 'rf':
-        clf = classifier(x, y, method='svm', n_cv=1)
-        clf.svm(n_splits=10)
-    else:
-        # eigenpro
-        eigenpro(x, y, max_iter=args.n_iter, test_size=args.test_size)
+    # eigenpro
+    eigenpro(x, y, max_iter=args.n_iter, test_size=args.test_size)
