@@ -38,19 +38,19 @@ DIRECT = '/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/' # mn10
 
 def load_clfdgm(idx =1):
     dgm = d.Diagram([[np.random.random(), 1]])
-    for fil_d in ['sub', 'sup', 'epd']:
+    for fil_d in ['sub']:#['sub', 'sup', 'epd']:
         dir = os.path.join(DIRECT, graph, fil, fil_d, 'norm_True', '')
         f = dir + str(idx) + '.csv'
 
         try:
             tmp_dgm = load_dgm(dir, filename=f)
         except FileNotFoundError:
-            print(f'{f} of size {all_dataset[i].pos.shape[0]}/{all_dataset[i].face.shape[1]} not found. Added a dummy one')
+            print(f'{f} of size {all_dataset[idx].pos.shape[0]}/{all_dataset[idx].face.shape[1]} not found. Added a dummy one')
             tmp_dgm = d.Diagram([[0, 0]])
 
         dgm = add_dgm(dgm, tmp_dgm)
     # print(f'finsih {idx}-th diagram')
-    return tmp_dgm
+    return dgm
 
 
 if __name__ == '__main__':
@@ -69,7 +69,6 @@ if __name__ == '__main__':
     dgms = []
 
     dgms = Parallel(n_jobs=-1, backend='multiprocessing')(delayed(load_clfdgm)(idx=i) for i in range(n))
-    print(f'len of dgms is {len(dgms)}')
     if args.permute: dgms = permute_dgms(dgms, permute_flag=True)
 
     if args.kernel == 'sw':
@@ -92,7 +91,7 @@ if __name__ == '__main__':
 
     _, y = modelnet2graphs(version=graph[-2:], print_flag=True, labels_only=True)
     print(f'total num is {len(y)}')
-    y = np.array(y)[:args.idx]
+    y = np.array(y)
     print(Counter(list(y)))
 
     # eigenpro
