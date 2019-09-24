@@ -602,7 +602,8 @@ def g2dgm(i, g=None, fil='deg', fil_d = 'sub', norm=False, one_hom=False, debug_
     if kwargs.get('write', None) == True: # 一个后门
         if one_hom == True: fil_d = 'epd'
         fil_save = fil + '_nbr' + str(args.nbr_size) + '_exp' + str(args.exp)
-        dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/', 'mn' + version, fil_save, fil_d,'norm_' + str(norm), '')
+        ntda = 'ntda_' + str(kwargs.get('ntda', 'NotFound'))
+        dir = os.path.join('/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/', 'mn' + version, ntda, fil_save, fil_d,'norm_' + str(norm), '')
         export_dgm(dgm, dir=dir, filename= str(i) +'.csv', print_flag=True)
     return dgm
 
@@ -721,15 +722,15 @@ if __name__ == '__main__':
     # modelnet
     version = '40'
     a, b, n_jobs = args.a, args.b, args.n_jobs
-    fil = 'hks_1'  # 'fiedler'
+    fil = 'cc_w'  # 'fiedler'
 
-    kw = {'a': a, 'b': b, 'fil': fil}
-    # if check_partial_dgms(**kw, fil_d='sub') and check_partial_dgms(**kw, fil_d='sup') and check_partial_dgms(**kw, fil_d='epd'): sys.exit()
+    kw = {'a': a, 'b': b, 'fil': 'cc_w_nbr8_expFalse'}
+    # if check_partial_dgms(**kw, fil_d='sub', graph='mn40') and check_partial_dgms(**kw, fil_d='sup', graph='mn40') and check_partial_dgms(**kw, fil_d='epd', graph='mn40'): sys.exit()
 
     # gs, labels = modelnet2graphs(version=version, print_flag=True, a=a, b=b, weight_flag=True)  # todo weight_flag is false for fiedler
     gs, labels = modelnet2pts2gs(version=version, a=a, b=b, nbr_size=args.nbr_size, exp_flag=args.exp)
     print(len(gs), len(labels))
-    norm, ntda = True, False
+    norm, ntda = True, True #todo change to ntda to True
 
     for fil in ['cc_w']: #['fiedler_s' ,'hks_0.1', 'hks_1', 'hks_10', 'hks_100']: # ['hks_1', 'hks_10', 'hks_0.1', 'fiedler_w']:  # ['hks_1']: #['hks_1', 'hks_10', 'hks_0.1']:
 

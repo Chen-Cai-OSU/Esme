@@ -63,6 +63,8 @@ class pipl():
         def arctan(C, p):
             return lambda x: C * np.arctan(np.power(x[1], p))
 
+
+
         if self.vec_type == 'pi':
             if True:
                 diagsT = DiagramPreprocessor(use=True, scalers=[([0, 1], BirthPersistenceTransform())]).fit_transform(self.diags)
@@ -85,6 +87,13 @@ class pipl():
 
                 # PI = tda.PersistenceImage(bandwidth=1.0, weight=arctan(1.0, 1.0), im_range=[0, 1, 0, 1], resolution=[25, 25])
                 res = PI.fit_transform(diagsT)
+
+        elif self.vec_type == 'pi_':
+            kwargs_ = filterdict(kwargs, ['bandwidth', 'weight', 'im_range', 'resolution'])
+            diagsT = DiagramPreprocessor(use=True, scalers=[([0, 1], BirthPersistenceTransform())]).fit_transform(self.diags)
+            PI = PersistenceImage(**kwargs_) #(bandwidth=1., weight=lambda x: x[1], im_range=[0, 2, 0, 2], resolution=[20, 20])
+            res = PI.fit_transform(diagsT)
+
 
         elif self.vec_type == 'pl':
             kwargs_ = filterdict(kwargs, ['num_landscapes', 'resolution'])
@@ -235,6 +244,9 @@ def dgms2vec(dgms, vectype='pi', graphs = None, verbose = 0, **params):
     if vectype == 'pi':
         pi = pipl(dgms, type=vectype)
         vecs = pi.dgms_vecs(**params)
+    elif vectype == 'pi_':
+        pl = pipl(dgms, type=vectype)
+        vecs = pl.dgms_vecs(**params)
     elif vectype == 'pl':
         pl = pipl(dgms, type=vectype)
         vecs = pl.dgms_vecs(**params)
@@ -244,7 +256,6 @@ def dgms2vec(dgms, vectype='pi', graphs = None, verbose = 0, **params):
     elif vectype == 'pvector':
         pdv = pdvector()
         vecs = pdv.persistence_vectors(dgms)
-
     elif vectype =='bl1':
         diags = dgms2diags(dgms)
         from Esme.dgms.stats import bl1
@@ -310,10 +321,40 @@ def dgm_statfeat(dgm):
     feat = np.concatenate((statfeat(birthtime), statfeat(deathtime), statfeat(lifetime)))
     return feat
 
+def weight_f(b=3):
+    " return a function"
+
+    # test
+    # weight_f_helper = weight_f(2)
+    # res = weight_f_helper([0.5, 0.6])
+    # print(res)
+
+    def weight_f_helper(x):
+        """ weight function persistence image """
+        t = x[1]
+
+        if t < 0:
+            return b
+        elif t > 0 and t < b:
+            return t / np.float(b)
+        else:
+            return 1
+
+    return weight_f_helper
+
+
+
 if __name__ == '__main__':
     dgm = d.Diagram([(.2,.3), (.3,.4), (.5, .6)])
     dgms = [dgm] * 10
     labels = np.array([1, -1]*50)
+
+    params = {'bandwidth': 1.0,  'im_range': [0, 1, 0, 1], 'resolution': [20, 20]}
+    params['weight'] = weight_f(b=3) # lambda t:1
+
+    dgm_vector = dgms2vec(dgms, vectype='pi_', **params)
+    print(dgm_vector.shape)
+    sys.exit()
 
     # todo pl has problem
     params = {'num_landscapes': 5, 'resolution': 100}

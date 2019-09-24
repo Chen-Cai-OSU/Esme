@@ -8,7 +8,7 @@ def normalize_(X, axis=0):
     from sklearn.preprocessing import normalize
     return normalize(X, axis=axis)
 
-def dgms_summary(dgms, debug='off'):
+def dgms_summary(dgms, debug='off', print_flag = True):
     n = len(dgms)
     total_pts = [-1]*n
     unique_total_pts = [-1] * n # no duplicates
@@ -20,9 +20,33 @@ def dgms_summary(dgms, debug='off'):
         print(dgms)
     stat_with_multiplicity = (pf(np.mean(total_pts), precision=1), pf(np.std(total_pts), precision=1), np.min(total_pts), np.max(total_pts))
     stat_without_multiplicity = (pf(np.mean(unique_total_pts)), pf(np.std(unique_total_pts)), np.min(unique_total_pts), np.max(unique_total_pts))
-    print('Dgms with multiplicity    Mean: %s, Std: %s, Min: %s, Max: %s'%(pf(np.mean(total_pts)), pf(np.std(total_pts)), pf(np.min(total_pts)), pf(np.max(total_pts))))
-    print('Dgms without multiplicity Mean: %s, Std: %s, Min: %s, Max: %s'%(pf(np.mean(unique_total_pts)), pf(np.std(unique_total_pts)), pf(np.min(unique_total_pts)), pf(np.max(unique_total_pts))))
+    if print_flag:
+        print('Dgms with multiplicity    Mean: %s, Std: %s, Min: %s, Max: %s'%(pf(np.mean(total_pts)), pf(np.std(total_pts)), pf(np.min(total_pts)), pf(np.max(total_pts))))
+        print('Dgms without multiplicity Mean: %s, Std: %s, Min: %s, Max: %s'%(pf(np.mean(unique_total_pts)), pf(np.std(unique_total_pts)), pf(np.min(unique_total_pts)), pf(np.max(unique_total_pts))))
     return (stat_with_multiplicity, stat_without_multiplicity)
+
+def dgms_summary_ex(dgms, print_flag = True, threshold=0.1):
+    """
+    :param dgms:
+    :param print_flag:
+    :param threshold: only count num of pd points whose lifetime is threshold(0.1) of max lifetime
+    :return:
+    """
+    stat_with_multiplicity, stat_without_multiplicity = dgms_summary(dgms, debug='off', print_flag=print_flag)
+    n = len(dgms)
+    cts = []
+    for i in range(n):
+        max_lifetime, ct = 0, 0
+        for p in dgms[i]:
+            max_lifetime = max(max_lifetime, abs(p.birth - p.death))
+        for p in dgms[i]:
+            if abs(p.birth - p.death) <= threshold * max_lifetime:
+                ct += 1
+        cts.append(ct)
+    average_pt = np.mean(cts)
+    return list(stat_without_multiplicity) + [average_pt]
+
+
 
 def test_():
     import dionysus as d
@@ -79,3 +103,8 @@ def bl1(dgms):
     blfeat = normalize_(blfeat, axis=0)
     return blfeat
 
+if __name__ == '__main__':
+    from Esme.dgms.test import randomdgms
+    dgms = randomdgms(10)
+    res = dgms_summary_ex(dgms, threshold=.5)
+    print(res)
