@@ -16,6 +16,7 @@ import os.path as osp
 from Esme.helper.io_related import make_dir
 from Esme.shape.util import load_labels
 from Esme.shape.util import prince_cat
+from Esme.helper.format import normalize_
 
 parser = ArgumentParser("scoring", formatter_class=ArgumentDefaultsHelpFormatter, conflict_handler='resolve')
 parser.add_argument("--idx", default=200, type=int,
@@ -84,13 +85,20 @@ if __name__ == '__main__':
     # vectorize
     if args.vec == 'pvector':
         dgm_vector = dgms2vec(dgms, vectype='pvector')  # print(np.shape(pd_vector), np.shape(pd_vectors))
+
     elif args.vec == 'pl':
         kwargs = {'num_landscapes':5, 'resolution':100}
         dgm_vector = dgms2vec(dgms, vectype='pl', **kwargs)
+
+    elif args.vec == 'pi_':
+        params = {'bandwidth': 1.0, 'weight': lambda x: x[1], 'im_range': [0, 1, 0, 1], 'resolution': [20, 20]}
+        dgm_vector= dgms2vec(dgms, vectype='pi_', **params)
+        print(dgm_vector.shape)
+        sys.exit()
+
     elif args.vec == 'pervec':
         kwargs = {'dim':300}
         dgm_vector = dgms2vec(dgms, vectype='pervec')  # print(np.shape(pd_vector), np.shape(pd_vectors))
-        from Esme.helper.format import normalize_
         dgm_vector = normalize_(dgm_vector)
     else:
         raise Exception(f'No vec like {args.vec}')

@@ -25,21 +25,23 @@ parser.add_argument("--clf", default='eigenpro', type=str, help='choose classifi
 parser.add_argument("--test_size", default=0.1, type=float, help='test size')
 parser.add_argument("--n_iter", default=50, type=int, help='num of iters for eigenpro') # (1515, 500) (3026,)
 parser.add_argument("--fil", default='cc_w_nbr8_expFalse', type=str, help='filtration')
-parser.add_argument("--kernel", default='sw', type=str, help='kernel type')
+parser.add_argument("--kernel", default='sw_', type=str, help='kernel type')
 parser.add_argument("--version", default='10', type=str, help='10 or 40')
 
 
 parser.add_argument("--permute", action='store_true')
 parser.add_argument("--norm", action='store_true')
 parser.add_argument("--random", action='store_true')
+parser.add_argument("--ntda", action='store_true')
 
 
 DIRECT = '/home/cai.507/anaconda3/lib/python3.6/site-packages/save_dgms/' # mn10/fiedler'
 
-def load_clfdgm(idx =1):
+def load_clfdgm(idx =1, ntda = False):
     dgm = d.Diagram([[np.random.random(), 1]])
     for fil_d in ['sub']:#['sub', 'sup', 'epd']:
         dir = os.path.join(DIRECT, graph, fil, fil_d, 'norm_True', '')
+        if ntda: dir = os.path.join(DIRECT, graph, 'ntda_True',fil, fil_d, 'norm_True', '')
         f = dir + str(idx) + '.csv'
 
         try:
@@ -57,7 +59,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # check_partial_dgms(DIRECT, graph=graph, fil=fil, fil_d=fil_d, a = 200, b = 1700)
-    version = '10'
+    version = '40'
 
     train_dataset, test_dataset = load_modelnet(version, point_flag=False)
     if version == '40':  train_dataset = train_dataset[:3632] + train_dataset[3633:3763] + train_dataset[3764:]
@@ -68,24 +70,29 @@ if __name__ == '__main__':
     n = len(labels)
     dgms = []
 
-    dgms = Parallel(n_jobs=-1, backend='multiprocessing')(delayed(load_clfdgm)(idx=i) for i in range(n))
+    dgms = Parallel(n_jobs=-1, backend='multiprocessing')(delayed(load_clfdgm)(idx=i, ntda = args.ntda) for i in range(n))
     if args.permute: dgms = permute_dgms(dgms, permute_flag=True)
 
     if args.kernel == 'sw':
         swdgms = dgms2swdgms(dgms)
-        feat_kwargs = {'n_directions': 10, 'bw': 1}
-        print(f'star computing kernel...')
-        k, _ = sw_parallel(swdgms, swdgms, parallel_flag=True, kernel_type='sw', **feat_kwargs)
-        print(k.shape)
+        for bw in [0.1,1,10,100]:
+            feat_kwargs = {'n_directions': 10, 'bw': bw}
+            print(f'star computing kernel...')
+            k, _ = sw_parallel(swdgms, swdgms, parallel_flag=True, kernel_type='sw', **feat_kwargs)
+            print(k.shape)
 
-        cmargs = {'print_flag': 'off'}  # confusion matrix
-        clf = classifier(labels, labels, method='svm', n_cv=1, kernel=k, **cmargs)
-        clf.svm_kernel_(n_splits=10)
+            cmargs = {'print_flag': 'off'}  # confusion matrix
+            clf = classifier(labels, labels, method='svm', n_cv=1, kernel=k, **cmargs)
+            clf.svm_kernel_(n_splits=10)
         sys.exit()
 
     # convert to vector
-    kwargs = {'num_landscapes': 5, 'resolution': 100, 'keep_zero': True}
-    x = dgms2vec(dgms, vectype='pl', **kwargs)
+    # kwargs = {'num_landscapes': 5, 'resolution': 100, 'keep_zero': True}
+    # x = dgms2vec(dgms, vectype='pl', **kwargs)
+    kwargs = {'dim':100}
+    print('using pervec')
+    x = dgms2vec(dgms, vectype='pervec', **kwargs)
+
     if args.random: x = np.random.random(x.shape)
     if args.norm: x = normalize_(x, axis=0)
 
@@ -95,4 +102,5 @@ if __name__ == '__main__':
     print(Counter(list(y)))
 
     # eigenpro
+    y = np.array(labels)
     eigenpro(x, y, max_iter=args.n_iter, test_size=args.test_size)

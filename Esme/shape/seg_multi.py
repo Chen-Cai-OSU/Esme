@@ -13,6 +13,7 @@ from Esme.ml.eigenpro import eigenpro
 from Esme.ml.svm import classifier
 from Esme.shape.util import face_num, loaddgm, node_num, face_idx, loady, load_labels, get_cat
 from Esme.helper.format import precision_format, rm_zerocol, normalize_
+from Esme.helper.time import timefunction
 
 
 def most_frequent(List):
@@ -23,7 +24,7 @@ def most_frequent(List):
     occurence_count = Counter(List)
     return occurence_count.most_common(1)[0][0]
 
-
+@timefunction
 def choose(X, Y, method='node_label', **kwargs):
     """
 
@@ -80,6 +81,7 @@ def get_y(args):
         y = loady(model=idx_, counter=True, seg=args.seg)
     return y
 
+@timefunction
 def get_vec(dgms, args):
     # vectorize
     if args.vec == 'pvector':
@@ -92,6 +94,11 @@ def get_vec(dgms, args):
         kwargs = {'dim': 300}
         dgm_vector = dgms2vec(dgms, vectype='pervec')  # print(np.shape(pd_vector), np.shape(pd_vectors))
         dgm_vector = normalize_(dgm_vector)
+    elif args.vec == 'pi_':
+        params = {'bandwidth': 0.1, 'im_range': [0, 2, 0, 2], 'resolution': [20, 20]}
+        from Esme.dgms.vector import weight_f
+        params['weight'] = weight_f(b=3)  # weight function in the paper
+        dgm_vector = dgms2vec(dgms, vectype='pi_', **params)
     else:
         raise Exception(f'No vec like {args.vec}')
     return dgm_vector
@@ -143,7 +150,6 @@ if __name__ == '__main__':
     n_test_shape = n_total_shape - n_train_shape
     n_train_dgms = 0
     permute_res = []
-
 
     X, Y, n_processed_shape = [], [], 0
     # args.permute = permute

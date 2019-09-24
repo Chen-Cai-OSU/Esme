@@ -60,8 +60,13 @@ def load_labels(cat='Airplane', idx=61):
     labels = list(range(len(cats)))
     unsort_cats = cats.copy()
     cats.sort()
-    cats2labels_dict = dict(zip(cats, labels))
-    # print(cats2labels_dict)
+
+    try:
+        cats2labels_dict = parts_dict()[cat]
+    except:
+        cats2labels_dict = dict(zip(cats, labels))
+
+    print(cats2labels_dict)
 
     for i, indice in enumerate(indices):
         indice = str(indice).split(' ')[:-1]
@@ -93,8 +98,8 @@ def face_num(file='0'):
     return int(res.split(' ')[1])
 
 @timefunction
-def face_idx(file = '0'):
-    """ read face index of the off file """
+def face_idx(file = '1'):
+    """ read face index of the off file for shap segmentation"""
     file_ = os.path.join(DGM_DIRECT, '..', 'tmp', '') + file
     with open(file_ + '.off') as f:
         res = f.readlines()
@@ -140,6 +145,8 @@ def color_map():
            3: 'red',
            4: 'purple',
            5: 'black',
+           6: 'orange',
+           7: 'grey'
            }
     return res
 
@@ -180,7 +187,7 @@ def loaddgm(f, form = 'mathieu', print_flag = True):
     :param form: either mathieu's form or dionysus's form
     :return:
     """
-    assert form in ['methieu', 'dionysus']
+    assert form in ['mathieu', 'dionysus']
 
     direct = DGM_DIRECT
     direct = os.path.join(direct,  f)
@@ -190,7 +197,7 @@ def loaddgm(f, form = 'mathieu', print_flag = True):
         dgms = pickle.load(fp)
 
     if form == 'mathieu':
-        return dgms # # a typical dgm is x the following form: x = ([(1834, 1), (2434, 2416)], [(1.5937974886466386, 0.0), (1.530983082142745, 0.49418551657459003)])
+        return dgms # # a typical dgm is x the following form: x = ([(1834, 1), (2434, 2416)], [(1.596, 0.0), (1.53, 0.493)])
     else:
         dio_dgms = []  # a list of pd (array of shape (n,2))
         for dgm in dgms:
@@ -201,7 +208,6 @@ def loaddgm(f, form = 'mathieu', print_flag = True):
             dio_dgms.append(pd)
         dgms = [diag2dgm(diag) for diag in dio_dgms]
         return dgms
-
 
 def check(f):
     res_ = loaddgm(f)
@@ -257,13 +263,60 @@ def get_cat(idx):
             return v
     raise Exception(f'No cat for idx {idx} found')
 
+def parts_dict():
+    """ encode parts dict for different (not all) shapes """
+    parts_dict = {}
+    parts_dict['Fourleg'] = {b'earhorn': 0, b'head': 1, b'leg': 2, b'neck': 3, b'tail': 4, b'torso': 5}
+    parts_dict['Vase'] = {b'body': 0, b'handle': 1, b'spout': 2, b'top': 3,  b'base':4}
+    parts_dict['Bearing'] = {b'base1': 0, b'base2': 1, b'bigroller': 2, b'smallroller': 3, b'tinyroller': 4, b'mediumroller': 5}
+    parts_dict['Mech']  = {b'bigbox': 0, b'smallcylinder': 1, b'mediumcylinder': 2, b'smallbox': 3,  b'bigcylinder':4}
+    parts_dict['Bust'] = {b'background': 0, b'ear': 1, b'eye': 2, b'face': 3, b'hair': 4, b'mouth': 5, b'neck': 6, b'nose': 7}
+    parts_dict['Armadillo'] = {b'back': 0, b'ear': 1, b'foot': 2, b'hand': 3, b'head': 4, b'lowerArm': 5, b'lowerLeg': 6, b'tail': 7, b'torso': 8, b'upperArm': 9, b'upperLeg': 10}
+    parts_dict['Bird'] = {b'body': 0, b'head': 1, b'leg': 2, b'tail': 3, b'wing': 4}
+    parts_dict['Fish'] = {b'body': 0, b'fin': 1, b'tail': 2}
+    parts_dict['Plier'] = {b'center': 0, b'edge': 1, b'handle': 2}
+    parts_dict['Hand'] = {b'finger1': 0, b'finger2': 1, b'finger3': 2, b'finger4': 3, b'hand': 4, b'thumb': 5}
+    parts_dict['Teddy'] = {b'ear': 0, b'hand': 1, b'head': 2, b'leg': 3, b'torso': 4}
+    parts_dict['Airplane'] = {b'body': 0, b'engine': 1, b'rudder': 2, b'stabilizer': 3, b'wing': 4}
+    parts_dict['Glasses'] = {b'lens': 0, b'middle': 1, b'skeleton': 2}
+    parts_dict['Cup'] = {b'body': 0, b'handle': 1}
+    parts_dict['Human'] = {b'foot': 0, b'hand': 1, b'head': 2, b'lowerarm': 3, b'lowerleg': 4, b'torso': 5, b'upperarm': 6, b'upperleg': 7}
+    return parts_dict
+
+
 
 if __name__ == '__main__':
-    cat = 'Airplane'
-    for idx in range(61, 62):
+    from Esme.dgms.stats import stat, dgms_summary
+    from itertools import chain
+    import matplotlib.pyplot as plt
+
+    num_pdpoints = []
+    for i in range(1,5): #chain(range(1, 261), range(281,401)):
+        dgms = loaddgm(str(i), form = 'dionysus', print_flag = True)
+        print(get_cat(i))
+        _, stat = dgms_summary(dgms) # stat is (mean, std, min, max)
+        num_pdpoints.append(stat[0])
+    plt.plot(stat)
+    plt.show()
+
+
+
+    sys.exit()
+    res = face_idx(file='1')
+    print(res)
+    sys.exit()
+    cat_dict = prince_cat()
+
+    cat = 'Human'
+    for idx in chain(range(1, 261), range(281,401)):
+        for k, v in cat_dict.items():
+            if k[0]<= idx and k[1]>idx:
+                cat = v
+                break
+        print(cat)
         y = load_labels(cat=cat, idx=idx)
-        print(f'Done for idx {idx}')
-        print(y)
+        if idx % 20==0: print('-'*50)
+
     sys.exit()
 
     print(off_face_color(c_flag=True))
