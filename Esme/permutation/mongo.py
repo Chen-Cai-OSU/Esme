@@ -132,9 +132,10 @@ def examine_homology(db, latex_f = False, stoa = {}):
     """
 
     # query = 'permute == False and flip == False and _id >=0 and graph=="' + graph + '"'
-    query = f'permute == {PERMUTE} and flip == {FLIP} and _id >={ID_THRESHOLD} and feat=="{FEAT}"'
+    query = f'permute == {PERMUTE} and flip == {FLIP} and _id >={ID_THRESHOLD} and feat=="{FEAT}" and fil!="random"'
     df = sacred_to_df(db.runs).query(query)
     grouped = df.groupby(['epd', 'graph'], as_index=False)
+
     df = grouped['result'].aggregate(max)
     df = df.pivot(index='epd', columns='graph', values='result')
     df = df_format(df)
@@ -149,6 +150,8 @@ def examine_homology(db, latex_f = False, stoa = {}):
     print()
     if latex_f:
         print(df.to_latex(longtable=False).replace('\n', '\n\\caption{' + caption + '}\\\\\n', 1))
+    return df
+
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 parser = ArgumentParser("scoring", formatter_class=ArgumentDefaultsHelpFormatter, conflict_handler='resolve')
@@ -157,6 +160,20 @@ parser.add_argument("--n_entry", default=20, type=int, help='number recent entri
 if __name__ == '__main__':
     db = get_tda_db()
     args = parser.parse_args()
+
+    # examine_homology
+    FEAT = 'pervec'
+    df = examine_homology(db, latex_f=True, stoa=perslay())
+    allowd_cols = ['graph','bzr', 'cox2', 'dd_test', 'dhfr', 'frankenstein', 'imdb_binary', 'imdb_multi', 'nci1', 'protein_data', 'ptc', 'reddit_5K']
+    column_names = list(df.columns)
+    drop_cols = [col for col in column_names if col not in allowd_cols]
+    df_ = df.drop(drop_cols, axis=1)
+
+    print(df_.to_latex())
+
+    # FEAT = 'pervec'
+    # examine_homology(db, latex_f=True)
+    sys.exit()
 
     # test the pf query
     query = f'n_cv=={1} and permute == False and flip == {FLIP} and _id >={ID_THRESHOLD} and graph=="{"protein_data"}" and feat=="pf" and ntda!=True'
