@@ -11,10 +11,11 @@ from Esme.dgms.compute import alldgms
 from Esme.dgms.format import dgms2swdgms
 from Esme.dgms.kernel import sw_parallel
 from Esme.embedding.lap import LaplacianEigenmaps
-from Esme.graph.egograph import egograph
+# from Esme.graph.egograph import egograph
 from Esme.graph.function import fil_strategy
 from Esme.graph.generativemodel import sbm2
 from Esme.ml.svm import classifier
+import sys
 
 if __name__ == '__main__':
     radius, zigzag, fil, n1, n2 = 1, True, 'deg', 150, 150
@@ -28,9 +29,12 @@ if __name__ == '__main__':
 
     kwargs = {'h': 0.3}
     g = fil_strategy(g, lapfeat, method=fil_method, viz_flag=False, **kwargs)
+    print(g)
+    # sys.exit()
 
-    ego = egograph(g, radius=radius, n=len(g), recompute_flag=True, norm_flag=True, print_flag=False)
-    egographs = ego.egographs(method='serial')
+    # ego = egograph(g, radius=radius, n=len(g), recompute_flag=True, norm_flag=True, print_flag=False)
+    # egographs = ego.egographs(method='serial') # todo fix function egograph
+    egographs = [g] * 300
     dgms = alldgms(egographs, radius=radius, dataset='', recompute_flag=True, method='serial', n=n1+n2, zigzag=zigzag)  # compute dgms in parallel
 
     swdgms = dgms2swdgms(dgms)
